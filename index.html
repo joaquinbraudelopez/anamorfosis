@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Arte Anamórfico</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f0f0f0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        input[type="file"] { margin: 20px 0; }
+        canvas { max-width: 100%; height: auto; border: 1px solid #ddd; margin-top: 20px; }
+        .controls { margin: 20px 0; text-align: left; background: #eee; padding: 15px; border-radius: 5px;}
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="range"] { width: 100%; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; margin-top: 10px;}
+        button:hover { background: #0056b3; }
+        .note { font-size: 0.8em; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎨 Tu Convertidor Anamórfico</h1>
+    <p>Sube una imagen para deformarla y proyectarla en el cilindro.</p>
+    
+    <input type="file" id="upload" accept="image/*">
+
+    <div class="controls">
+        <label>Tamaño del Agujero Central (Radio del Cilindro)</label>
+        <input type="range" id="innerRadius" min="10" max="100" value="30">
+        <div class="note">Ajusta esto hasta que la proporción se vea bien. El agujero blanco es donde apoyas el cilindro.</div>
+        
+        <br>
+        <label>Escala de la Imagen (Zoom)</label>
+        <input type="range" id="scale" min="50" max="200" value="100">
+    </div>
+
+    <canvas id="canvas"></canvas>
+    <br>
+    <button id="downloadBtn" style="display:none;">Descargar Imagen para Imprimir</button>
+</div>
+
+<script>
+    const upload = document.getElementById('upload');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const innerRadiusSlider = document.getElementById('innerRadius');
+    const scaleSlider = document.getElementById('scale');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    let img = new Image();
+    let isImageLoaded = false;
+
+    upload.addEventListener('change', (e) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            img.onload = () => {
+                isImageLoaded = true;
+                draw();
+                downloadBtn.style.display = 'inline-block';
+            }
+            img.src = event.target.result;
+        }
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    [innerRadiusSlider, scaleSlider].forEach(slider => {
+        slider.addEventListener('input', draw);
+    });
+
+    function draw() {
+        if (!isImageLoaded) return;
+
+        // Configuración del lienzo cuadrado
+        const size = 1000; // Resolución de salida alta
+        canvas.width = size;
+        canvas.height = size;
+        
+        const cx = size / 2;
+        const cy = size / 2;
+        const radius = size / 2;
+        
+        // Limpiar
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, size, size);
+
+        // Obtener datos de la imagen original
+        // Dibujamos la imagen original en un canvas temporal para leer sus pixeles
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(img, 0, 0);
+        const sourceData = tempCtx.getImageData(0, 0, img.width, img.height);
+
+        // Crear imagen destino
+        const destImageData = ctx.createImageData(size, size);
+        const data = destImageData.data;
+
+        // Parámetros de usuario
+        // El slider va de 10 a 100, que representa el % del radio total que es el agujero
+        const holePct = innerRadiusSlider.value / 200; // 0.05 a 0.5
+        const rInner = size * holePct; 
+        const zoom = scaleSlider.value / 100;
+
+        // Recorrer cada pixel del lienzo circular (destino)
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                // Coordenadas relativas al centro
+                const dx = x - cx;
+                const dy = y - cy;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                // Si estamos fuera del círculo máximo o dentro del agujero del cilindro, saltar (queda blanco)
+                if (dist > radius || dist < rInner) continue;
+
+                // Transformación: Convertir polar (distancia, ángulo) a cartesiano (u, v) de la imagen original
+                
+                // 1. Ángulo -> Eje X de la imagen original
+                let angle = Math.atan2(dy, dx); // -PI a PI
+                // Ajustar rotación para que la imagen quede "de pie" frente al cilindro
+                angle = angle + Math.PI / 2; 
+                if (angle < 0) angle += 2 * Math.PI;
+                
+                // Mapear ángulo 0-2PI al ancho de la imagen
+                const u = (angle / (2 * Math.PI)) * img.width;
+
+                // 2. Distancia -> Eje Y de la imagen original
+                // Mapeamos la distancia radial a la altura de la imagen
+                // rInner corresponde a la parte de abajo de la imagen (y = height)
+                // radius corresponde a la parte de arriba de la imagen (y = 0)
+                // Usamos el zoom para ajustar qué tanto "estiramos"
+                
+                const distNormalizada = (dist - rInner) / (radius - rInner); // 0 a 1
+                const v = (1 - distNormalizada) * img.height * zoom;
+
+                // Si nos salimos de la imagen original, no pintar
+                if (v < 0 || v >= img.height) continue;
+
+                // Muestreo (Nearest neighbor simple para velocidad)
+                const srcX = Math.floor(u);
+                const srcY = Math.floor(v);
+                const srcIndex = (srcY * img.width + srcX) * 4;
+                
+                const destIndex = (y * size + x) * 4;
+
+                data[destIndex] = sourceData.data[srcIndex];     // R
+                data[destIndex + 1] = sourceData.data[srcIndex + 1]; // G
+                data[destIndex + 2] = sourceData.data[srcIndex + 2]; // B
+                data[destIndex + 3] = 255; // Alpha
+            }
+        }
+
+        ctx.putImageData(destImageData, 0, 0);
+        
+        // Dibujar un círculo guía pequeño para saber dónde va el cilindro (opcional, ayuda a recortar)
+        ctx.beginPath();
+        ctx.arc(cx, cy, rInner, 0, 2 * Math.PI);
+        ctx.strokeStyle = "#ccc";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    downloadBtn.addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = 'anamorfosis-para-imprimir.png';
+        link.href = canvas.toDataURL();
+        link.click();
+    });
+</script>
+
+</body>
+</html>
