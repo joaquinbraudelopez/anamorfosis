@@ -3,90 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de Arte Anamórfico</title>
+    <title>Generador Anamórfico (Versión Escritorio)</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f0f0f0; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { color: #333; }
-        input[type="file"] { margin: 20px 0; }
-        canvas { max-width: 100%; height: auto; border: 1px solid #ddd; margin-top: 20px; }
-        .controls { margin: 20px 0; text-align: left; background: #eee; padding: 15px; border-radius: 5px;}
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="range"] { width: 100%; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; margin-top: 10px;}
-        button:hover { background: #0056b3; }
-        .note { font-size: 0.8em; color: #666; margin-top: 5px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f4f4f9; color: #333; margin: 0; padding: 20px; }
+        
+        /* Estilos pantalla */
+        .no-print { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.5rem; color: #444; margin-bottom: 10px; }
+        
+        .upload-btn-wrapper { position: relative; overflow: hidden; display: inline-block; margin-bottom: 20px;}
+        .btn { border: 2px solid #555; color: #555; background-color: white; padding: 8px 20px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .upload-btn-wrapper input[type=file] { font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; }
+        
+        input[type="range"] { width: 100%; margin: 15px 0; }
+        
+        button.print-btn { background: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 20px;}
+        button.print-btn:hover { background: #0056b3; }
+
+        /* EL LIENZO EN PANTALLA */
+        #canvas-container { margin-top: 20px; display: flex; justify-content: center; align-items: center; flex-direction: column; }
+        canvas { 
+            max-width: 90%; 
+            height: auto; 
+            border: 1px dashed #ccc; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        /* --- CONFIGURACIÓN DE IMPRESIÓN CORREGIDA --- */
+        @media print {
+            /* 1. Elimina encabezados y pies de página automáticos del navegador */
+            @page {
+                margin: 0;
+                size: A4 portrait;
+            }
+
+            body, html { 
+                background: white; 
+                margin: 0; 
+                padding: 0; 
+                height: 100%; /* Forzar altura completa */
+                width: 100%;
+                /* Usar Flexbox para centrar perfectamente sin romper página */
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .no-print { display: none !important; } 
+            
+            #canvas-container { 
+                /* Reseteamos posiciones absolutas que causaban el corte */
+                position: static; 
+                transform: none;
+                margin: 0;
+                padding: 0;
+                display: block;
+            }
+            
+            canvas {
+                width: 15cm !important; 
+                height: 15cm !important; 
+                border: none;
+                box-shadow: none;
+                display: block;
+            }
+
+            /* Marcas de corte */
+            #canvas-container::after {
+                content: "✂️ Recortar por el borde (Diámetro: 15cm)";
+                display: block;
+                text-align: center;
+                font-size: 10pt;
+                color: #999;
+                margin-top: 15px; /* Un poco de aire */
+            }
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🎨 Tu Convertidor Anamórfico</h1>
-    <p>Sube una imagen para deformarla y proyectarla en el cilindro.</p>
+<div class="no-print">
+    <h1>🎨 Crea tu Regalo</h1>
+    <p>La imagen saldrá de <strong>15 cm</strong> con el espacio exacto para tu cilindro de <strong>6 cm</strong>.</p>
     
-    <input type="file" id="upload" accept="image/*">
-
-    <div class="controls">
-        <label>Tamaño del Agujero Central (Radio del Cilindro)</label>
-        <input type="range" id="innerRadius" min="10" max="100" value="30">
-        <div class="note">Ajusta esto hasta que la proporción se vea bien. El agujero blanco es donde apoyas el cilindro.</div>
-        
-        <br>
-        <label>Escala de la Imagen (Zoom)</label>
-        <input type="range" id="scale" min="50" max="200" value="100">
+    <div class="upload-btn-wrapper">
+        <button class="btn">📂 Seleccionar Foto</button>
+        <input type="file" id="upload" accept="image/*">
     </div>
 
+    <div id="controls" style="display:none;">
+        <label>🔍 Zoom / Encuadre</label>
+        <input type="range" id="scale" min="50" max="250" value="100">
+        
+        <br>
+        <button class="print-btn" onclick="window.print()">🖨️ IMPRIMIR</button>
+        <p style="font-size: 0.85rem; margin-top:15px; background: #fff3cd; padding: 10px; border-radius: 5px; display: inline-block;">
+            ⚠️ <strong>Ojo:</strong> Al imprimir, elige escala <strong>"100%"</strong> o <strong>"Personalizado: 100"</strong>. <br>No uses "Ajustar a página".
+        </p>
+    </div>
+</div>
+
+<div id="canvas-container">
     <canvas id="canvas"></canvas>
-    <br>
-    <button id="downloadBtn" style="display:none;">Descargar Imagen para Imprimir</button>
 </div>
 
 <script>
     const upload = document.getElementById('upload');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-    const innerRadiusSlider = document.getElementById('innerRadius');
     const scaleSlider = document.getElementById('scale');
-    const downloadBtn = document.getElementById('downloadBtn');
+    const controlsDiv = document.getElementById('controls');
 
     let img = new Image();
     let isImageLoaded = false;
 
+    // --- MATEMÁTICA DEL CILINDRO ---
+    // Ratio = 6 / 15 = 0.4
+    const FIXED_HOLE_RATIO = 6 / 15; 
+
     upload.addEventListener('change', (e) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            img.onload = () => {
-                isImageLoaded = true;
-                draw();
-                downloadBtn.style.display = 'inline-block';
+        if(e.target.files && e.target.files[0]){
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                img.onload = () => {
+                    isImageLoaded = true;
+                    controlsDiv.style.display = 'block';
+                    draw();
+                }
+                img.src = event.target.result;
             }
-            img.src = event.target.result;
+            reader.readAsDataURL(e.target.files[0]);
         }
-        reader.readAsDataURL(e.target.files[0]);
     });
 
-    [innerRadiusSlider, scaleSlider].forEach(slider => {
-        slider.addEventListener('input', draw);
-    });
+    scaleSlider.addEventListener('input', draw);
 
     function draw() {
         if (!isImageLoaded) return;
 
-        // Configuración del lienzo cuadrado
-        const size = 1000; // Resolución de salida alta
+        const size = 2000; 
         canvas.width = size;
         canvas.height = size;
         
         const cx = size / 2;
         const cy = size / 2;
-        const radius = size / 2;
+        const radius = size / 2; 
         
-        // Limpiar
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, size, size);
 
-        // Obtener datos de la imagen original
-        // Dibujamos la imagen original en un canvas temporal para leer sus pixeles
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = img.width;
         tempCanvas.height = img.height;
@@ -94,80 +159,62 @@
         tempCtx.drawImage(img, 0, 0);
         const sourceData = tempCtx.getImageData(0, 0, img.width, img.height);
 
-        // Crear imagen destino
         const destImageData = ctx.createImageData(size, size);
         const data = destImageData.data;
 
-        // Parámetros de usuario
-        // El slider va de 10 a 100, que representa el % del radio total que es el agujero
-        const holePct = innerRadiusSlider.value / 200; // 0.05 a 0.5
-        const rInner = size * holePct; 
+        const rInner = size * (FIXED_HOLE_RATIO / 2); 
         const zoom = scaleSlider.value / 100;
 
-        // Recorrer cada pixel del lienzo circular (destino)
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                // Coordenadas relativas al centro
                 const dx = x - cx;
                 const dy = y - cy;
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                // Si estamos fuera del círculo máximo o dentro del agujero del cilindro, saltar (queda blanco)
                 if (dist > radius || dist < rInner) continue;
 
-                // Transformación: Convertir polar (distancia, ángulo) a cartesiano (u, v) de la imagen original
-                
-                // 1. Ángulo -> Eje X de la imagen original
-                let angle = Math.atan2(dy, dx); // -PI a PI
-                // Ajustar rotación para que la imagen quede "de pie" frente al cilindro
+                let angle = Math.atan2(dy, dx); 
                 angle = angle + Math.PI / 2; 
                 if (angle < 0) angle += 2 * Math.PI;
                 
-                // Mapear ángulo 0-2PI al ancho de la imagen
                 const u = (angle / (2 * Math.PI)) * img.width;
-
-                // 2. Distancia -> Eje Y de la imagen original
-                // Mapeamos la distancia radial a la altura de la imagen
-                // rInner corresponde a la parte de abajo de la imagen (y = height)
-                // radius corresponde a la parte de arriba de la imagen (y = 0)
-                // Usamos el zoom para ajustar qué tanto "estiramos"
-                
-                const distNormalizada = (dist - rInner) / (radius - rInner); // 0 a 1
+                const distNormalizada = (dist - rInner) / (radius - rInner);
                 const v = (1 - distNormalizada) * img.height * zoom;
 
-                // Si nos salimos de la imagen original, no pintar
                 if (v < 0 || v >= img.height) continue;
 
-                // Muestreo (Nearest neighbor simple para velocidad)
                 const srcX = Math.floor(u);
                 const srcY = Math.floor(v);
                 const srcIndex = (srcY * img.width + srcX) * 4;
-                
                 const destIndex = (y * size + x) * 4;
 
-                data[destIndex] = sourceData.data[srcIndex];     // R
-                data[destIndex + 1] = sourceData.data[srcIndex + 1]; // G
-                data[destIndex + 2] = sourceData.data[srcIndex + 2]; // B
-                data[destIndex + 3] = 255; // Alpha
+                data[destIndex] = sourceData.data[srcIndex];
+                data[destIndex + 1] = sourceData.data[srcIndex + 1];
+                data[destIndex + 2] = sourceData.data[srcIndex + 2];
+                data[destIndex + 3] = 255;
             }
         }
 
         ctx.putImageData(destImageData, 0, 0);
         
-        // Dibujar un círculo guía pequeño para saber dónde va el cilindro (opcional, ayuda a recortar)
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius - 2, 0, 2 * Math.PI);
+        ctx.strokeStyle = "#e0e0e0";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
         ctx.beginPath();
         ctx.arc(cx, cy, rInner, 0, 2 * Math.PI);
-        ctx.strokeStyle = "#ccc";
+        ctx.strokeStyle = "#cccccc";
         ctx.lineWidth = 2;
         ctx.stroke();
+        
+        ctx.fillStyle = "#ddd";
+        ctx.font = "60px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Ø 6cm", cx, cy);
     }
-
-    downloadBtn.addEventListener('click', () => {
-        const link = document.createElement('a');
-        link.download = 'anamorfosis-para-imprimir.png';
-        link.href = canvas.toDataURL();
-        link.click();
-    });
 </script>
 
 </body>
