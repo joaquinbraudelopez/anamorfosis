@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Anamórfico (Versión Escritorio)</title>
+    <title>Generador Anamórfico (Versión Abanico)</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f4f4f9; color: #333; margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f4f9; color: #333; margin: 0; padding: 20px; }
         
         /* Estilos pantalla */
         .no-print { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
@@ -20,62 +20,49 @@
         button.print-btn { background: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 20px;}
         button.print-btn:hover { background: #0056b3; }
 
-        /* EL LIENZO EN PANTALLA */
         #canvas-container { margin-top: 20px; display: flex; justify-content: center; align-items: center; flex-direction: column; }
         canvas { 
             max-width: 90%; 
             height: auto; 
             border: 1px dashed #ccc; 
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
 
-        /* --- CONFIGURACIÓN DE IMPRESIÓN CORREGIDA --- */
+        /* --- CONFIGURACIÓN DE IMPRESIÓN BLINDADA --- */
         @media print {
-            /* 1. Elimina encabezados y pies de página automáticos del navegador */
             @page {
-                margin: 0;
                 size: A4 portrait;
+                margin: 0; /* Elimina margenes del navegador */
             }
-
-            body, html { 
-                background: white; 
-                margin: 0; 
-                padding: 0; 
-                height: 100%; /* Forzar altura completa */
+            body, html {
                 width: 100%;
-                /* Usar Flexbox para centrar perfectamente sin romper página */
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                background: white;
+                /* Flexbox para centrar absoluto */
                 display: flex;
                 justify-content: center;
                 align-items: center;
+                overflow: hidden; /* Evita que salga una segunda hoja si sobra un pixel */
             }
-
             .no-print { display: none !important; } 
             
             #canvas-container { 
-                /* Reseteamos posiciones absolutas que causaban el corte */
-                position: static; 
-                transform: none;
-                margin: 0;
-                padding: 0;
-                display: block;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                page-break-inside: avoid; /* Prohibido cortar esto */
             }
             
             canvas {
+                /* Forzamos el tamaño correcto */
                 width: 15cm !important; 
                 height: 15cm !important; 
+                max-width: 15cm !important;
                 border: none;
-                box-shadow: none;
                 display: block;
-            }
-
-            /* Marcas de corte */
-            #canvas-container::after {
-                content: "✂️ Recortar por el borde (Diámetro: 15cm)";
-                display: block;
-                text-align: center;
-                font-size: 10pt;
-                color: #999;
-                margin-top: 15px; /* Un poco de aire */
             }
         }
     </style>
@@ -83,8 +70,8 @@
 <body>
 
 <div class="no-print">
-    <h1>🎨 Crea tu Regalo</h1>
-    <p>La imagen saldrá de <strong>15 cm</strong> con el espacio exacto para tu cilindro de <strong>6 cm</strong>.</p>
+    <h1>🎨 Versión Abanico (180°)</h1>
+    <p>La imagen se curvará en un semicírculo frente al cilindro.<br>Tamaño de impresión: <strong>15 cm</strong> (Agujero: 6 cm).</p>
     
     <div class="upload-btn-wrapper">
         <button class="btn">📂 Seleccionar Foto</button>
@@ -92,13 +79,13 @@
     </div>
 
     <div id="controls" style="display:none;">
-        <label>🔍 Zoom / Encuadre</label>
+        <label>🔍 Zoom</label>
         <input type="range" id="scale" min="50" max="250" value="100">
         
         <br>
         <button class="print-btn" onclick="window.print()">🖨️ IMPRIMIR</button>
         <p style="font-size: 0.85rem; margin-top:15px; background: #fff3cd; padding: 10px; border-radius: 5px; display: inline-block;">
-            ⚠️ <strong>Ojo:</strong> Al imprimir, elige escala <strong>"100%"</strong> o <strong>"Personalizado: 100"</strong>. <br>No uses "Ajustar a página".
+            ⚠️ Configura la impresión en escala <strong>100%</strong>.
         </p>
     </div>
 </div>
@@ -117,9 +104,10 @@
     let img = new Image();
     let isImageLoaded = false;
 
-    // --- MATEMÁTICA DEL CILINDRO ---
-    // Ratio = 6 / 15 = 0.4
+    // --- MATEMÁTICA ---
     const FIXED_HOLE_RATIO = 6 / 15; 
+    // Usamos 180 grados (PI) para que la imagen se vea de frente sin dar la vuelta entera
+    const SECTOR_ANGLE = Math.PI; 
 
     upload.addEventListener('change', (e) => {
         if(e.target.files && e.target.files[0]){
@@ -149,6 +137,7 @@
         const cy = size / 2;
         const radius = size / 2; 
         
+        // Limpiar
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, size, size);
 
@@ -173,11 +162,37 @@
                 
                 if (dist > radius || dist < rInner) continue;
 
-                let angle = Math.atan2(dy, dx); 
-                angle = angle + Math.PI / 2; 
-                if (angle < 0) angle += 2 * Math.PI;
+                // Calcular ángulo
+                // Math.atan2 devuelve de -PI a PI
+                // Queremos que la imagen esté ABAJO (semicírculo inferior)
+                // En canvas, Y crece hacia abajo.
+                // 0 es derecha, PI/2 es abajo, PI es izquierda.
                 
-                const u = (angle / (2 * Math.PI)) * img.width;
+                let angle = Math.atan2(dy, dx); 
+                
+                // Rotamos 90 grados (-PI/2) para que el "centro" de nuestro abanico sea el eje Y positivo (abajo)
+                // Ahora el ángulo 0 estaría abajo.
+                let adjustedAngle = angle - (Math.PI / 2);
+                
+                // Normalizar ángulo entre -PI y PI
+                if (adjustedAngle < -Math.PI) adjustedAngle += 2 * Math.PI;
+                if (adjustedAngle > Math.PI) adjustedAngle -= 2 * Math.PI;
+
+                // Definimos el sector: desde -PI/2 (-90deg) a +PI/2 (+90deg) respecto al eje vertical
+                // Esto cubre 180 grados en la parte inferior del círculo
+                const halfSector = SECTOR_ANGLE / 2;
+
+                if (Math.abs(adjustedAngle) > halfSector) {
+                    // Si estamos fuera del abanico de 180 grados, no pintar (dejar blanco)
+                    continue; 
+                }
+
+                // Mapear el ángulo (-PI/2 a PI/2) al ancho de la imagen (0 a width)
+                // Sumamos halfSector para ir de 0 a SECTOR_ANGLE
+                const anglePercent = (adjustedAngle + halfSector) / SECTOR_ANGLE;
+                const u = anglePercent * img.width;
+
+                // Mapear distancia (rInner a Radius) al alto de la imagen (height a 0)
                 const distNormalizada = (dist - rInner) / (radius - rInner);
                 const v = (1 - distNormalizada) * img.height * zoom;
 
@@ -185,7 +200,12 @@
 
                 const srcX = Math.floor(u);
                 const srcY = Math.floor(v);
-                const srcIndex = (srcY * img.width + srcX) * 4;
+                
+                // Clamp para evitar errores de borde
+                const safeX = Math.min(Math.max(srcX, 0), img.width - 1);
+                const safeY = Math.min(Math.max(srcY, 0), img.height - 1);
+
+                const srcIndex = (safeY * img.width + safeX) * 4;
                 const destIndex = (y * size + x) * 4;
 
                 data[destIndex] = sourceData.data[srcIndex];
@@ -197,9 +217,11 @@
 
         ctx.putImageData(destImageData, 0, 0);
         
+        // Líneas de corte y guía
         ctx.beginPath();
-        ctx.arc(cx, cy, radius - 2, 0, 2 * Math.PI);
-        ctx.strokeStyle = "#e0e0e0";
+        // Dibujamos solo el arco donde hay imagen
+        ctx.arc(cx, cy, radius - 2, 0, 2 * Math.PI); // Círculo completo tenue para recortar fácil
+        ctx.strokeStyle = "#eeeeee";
         ctx.lineWidth = 1;
         ctx.stroke();
 
@@ -209,11 +231,16 @@
         ctx.lineWidth = 2;
         ctx.stroke();
         
-        ctx.fillStyle = "#ddd";
+        ctx.fillStyle = "#ccc";
         ctx.font = "60px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("Ø 6cm", cx, cy);
+        
+        // Indicador de "FRENTE"
+        ctx.fillStyle = "#999";
+        ctx.font = "40px Arial";
+        ctx.fillText("⬇️ FRENTE ⬇️", cx, size - 50);
     }
 </script>
 
