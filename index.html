@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Anamórfico (Versión Muesca)</title>
+    <title>Generador Anamórfico (Versión Flecha Grande)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f4f9; color: #333; margin: 0; padding: 20px; }
         
@@ -34,8 +34,8 @@
 <body>
 
 <div class="no-print">
-    <h1>🎨 Versión Muesca</h1>
-    <p>Alinea la flecha pequeña con la marca en tu soporte 3D.</p>
+    <h1>🎨 Versión Flecha Grande</h1>
+    <p>Alinea la flecha impresa con la muesca de tu soporte 3D.</p>
     
     <div class="upload-btn-wrapper">
         <button class="btn">📂 Seleccionar Foto</button>
@@ -64,8 +64,9 @@
     let img = new Image();
     let isImageLoaded = false;
 
+    // 15cm total, 6cm agujero
     const FIXED_HOLE_RATIO = 6 / 15; 
-    const SECTOR_ANGLE = Math.PI; // 180 grados
+    const SECTOR_ANGLE = Math.PI; 
 
     upload.addEventListener('change', (e) => {
         if(e.target.files && e.target.files[0]){
@@ -87,7 +88,7 @@
     function draw() {
         if (!isImageLoaded) return;
 
-        const size = 2000; 
+        const size = 2000; // Resolución base
         canvas.width = size;
         canvas.height = size;
         
@@ -153,40 +154,53 @@
         
         // --- DIBUJOS DE GUÍA ---
         
-        // 1. Círculo de corte exterior (tenue)
+        // Círculos tenues
         ctx.beginPath();
         ctx.arc(cx, cy, radius - 2, 0, 2 * Math.PI);
         ctx.strokeStyle = "#eeeeee";
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // 2. Círculo del cilindro
         ctx.beginPath();
         ctx.arc(cx, cy, rInner, 0, 2 * Math.PI);
         ctx.strokeStyle = "#cccccc";
         ctx.lineWidth = 2;
         ctx.stroke();
         
-        // 3. LA MUESCA / FLECHA DE ALINEACIÓN
-        // Dibujamos un triángulo pequeño en la parte inferior del círculo central
-        const arrowSize = 40; // Tamaño de la flecha en pixeles
-        const arrowY = cy + rInner; // Justo en el borde inferior del agujero
+        // --- LA FLECHA GRANDE (GEOMETRÍA ACTUALIZADA) ---
+        // Dibujamos basándonos en tu diseño: ~2cm ancho, ~4cm largo
+        // En pixeles (aprox): 
+        // 15cm = 2000px  =>  1cm = 133px
+        // Ancho 2.1cm = 280px
+        // Largo 4.0cm = 533px
+        
+        const arrowWidth = 280;
+        const arrowLength = 530;
+        const startY = cy + rInner; // Borde del agujero (parte inferior)
 
         ctx.beginPath();
-        ctx.moveTo(cx, arrowY - arrowSize); // Punta hacia adentro (arriba)
-        ctx.lineTo(cx - (arrowSize/2), arrowY + 10); // Base izq
-        ctx.lineTo(cx + (arrowSize/2), arrowY + 10); // Base der
+        // Empezamos en el centro inferior del agujero
+        ctx.moveTo(cx, startY); 
+        
+        // Vamos hacia la izquierda y abajo (formando la cuña)
+        ctx.lineTo(cx - (arrowWidth/2), startY + arrowLength);
+        
+        // Vamos a la derecha
+        ctx.lineTo(cx + (arrowWidth/2), startY + arrowLength);
+        
+        // Volvemos al centro (cerrar triangulo)
         ctx.closePath();
         
-        ctx.fillStyle = "#555";
+        ctx.fillStyle = "#333"; // Gris oscuro para que se note
         ctx.fill();
 
-        // Texto técnico discreto
+        // Texto técnico dentro del agujero
         ctx.fillStyle = "#ccc";
         ctx.font = "40px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("Ø 6cm", cx, cy);
+        ctx.fillText("FRENTE", cx, startY + 50); // Texto dentro de la flecha para confirmar dirección
     }
 </script>
 
