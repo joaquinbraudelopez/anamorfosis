@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Anamórfico (Con Altura)</title>
+    <title>Generador Anamórfico (Altura Turbo)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f4f9; color: #333; margin: 0; padding: 20px; }
         
@@ -35,8 +35,8 @@
 <body>
 
 <div class="no-print">
-    <h1>🎨 Generador con Altura</h1>
-    <p>Usa el control de "Altura" para subir la proyección en el cilindro.</p>
+    <h1>🎨 Generador con Altura "Turbo"</h1>
+    <p>Sube la "Altura" para alejar el dibujo y subir el reflejo.</p>
     
     <div class="upload-btn-wrapper">
         <button class="btn">📂 Seleccionar Foto</button>
@@ -47,9 +47,9 @@
         <label>🔍 Zoom (Tamaño de la cara)</label>
         <input type="range" id="scale" min="50" max="250" value="100">
         
-        <label>⬆️ Altura (Subir imagen en el espejo)</label>
-        <input type="range" id="offset" min="0" max="60" value="0">
-        <small style="color:#666; display:block; text-align:left;">Esto aleja el dibujo de la base para que se refleje más arriba.</small>
+        <label>⬆️ Altura (Posición vertical)</label>
+        <input type="range" id="offset" min="0" max="100" value="30">
+        <small style="color:#666; display:block; text-align:left;">Cuanto más alto, más se aleja el dibujo del centro.</small>
 
         <br>
         <button class="print-btn" onclick="window.print()">🖨️ IMPRIMIR</button>
@@ -71,7 +71,6 @@
     let img = new Image();
     let isImageLoaded = false;
 
-    // Constantes físicas
     const FIXED_HOLE_RATIO = 6 / 15; 
     const SECTOR_ANGLE = Math.PI; 
 
@@ -104,11 +103,9 @@
         const cy = size / 2;
         const radius = size / 2; 
         
-        // Limpiar
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, size, size);
 
-        // Leer imagen fuente
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = img.width;
         tempCanvas.height = img.height;
@@ -119,16 +116,13 @@
         const destImageData = ctx.createImageData(size, size);
         const data = destImageData.data;
 
-        // Cálculos de geometría
         const rInner = size * (FIXED_HOLE_RATIO / 2); 
         
-        // --- AQUÍ ESTÁ LA MAGIA DEL OFFSET ---
-        // El offset es un porcentaje del espacio disponible en el papel
-        // Si offset es 0, empezamos en rInner.
-        // Si offset es alto, empezamos más lejos del centro.
+        // --- CÁLCULO DE ALTURA "TURBO" ---
         const availableSpace = radius - rInner;
         const offsetPct = offsetSlider.value / 100;
-        const rStart = rInner + (availableSpace * offsetPct * 0.8); // *0.8 para no salirnos del papel
+        // Ahora permite usar hasta el 95% del espacio (0.95)
+        const rStart = rInner + (availableSpace * offsetPct * 0.95); 
 
         const zoom = scaleSlider.value / 100;
 
@@ -138,7 +132,6 @@
                 const dy = y - cy;
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                // Zona prohibida (dentro del agujero O dentro de la zona de offset vacía)
                 if (dist > radius || dist < rStart) continue;
 
                 let angle = Math.atan2(dy, dx); 
@@ -150,11 +143,9 @@
                 const halfSector = SECTOR_ANGLE / 2;
                 if (Math.abs(adjustedAngle) > halfSector) continue; 
 
-                // Mapeo
                 const anglePercent = (adjustedAngle + halfSector) / SECTOR_ANGLE;
                 const u = anglePercent * img.width;
                 
-                // Mapeamos desde rStart hasta radius
                 const distNormalizada = (dist - rStart) / (radius - rStart);
                 const v = (1 - distNormalizada) * img.height * zoom;
 
@@ -176,7 +167,6 @@
         ctx.putImageData(destImageData, 0, 0);
         
         // --- GUÍAS ---
-        // Círculo exterior
         ctx.beginPath();
         ctx.arc(cx, cy, radius - 2, 0, 2 * Math.PI);
         ctx.strokeStyle = "#eeeeee";
@@ -190,14 +180,15 @@
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Círculo de inicio de imagen (donde empieza el dibujo realmente)
-        // Solo lo dibujamos si hay offset, para que sepa que ahí empieza
-        if (offsetSlider.value > 5) {
+        // Círculo de inicio de imagen (ROJO)
+        // Muestra dónde empieza realmente el dibujo
+        if (offsetSlider.value > 2) {
             ctx.beginPath();
-            ctx.arc(cx, cy, rStart, 0, 2 * Math.PI); // Arco completo o parcial
-            ctx.strokeStyle = "#ffcccc"; // Rojo clarito
-            ctx.setLineDash([10, 10]);
-            ctx.lineWidth = 1;
+            // Dibujamos solo el arco inferior para que no moleste
+            ctx.arc(cx, cy, rStart, 0.2 * Math.PI, 0.8 * Math.PI); 
+            ctx.strokeStyle = "#ff9999"; // Rojo claro
+            ctx.setLineDash([5, 5]); // Línea punteada
+            ctx.lineWidth = 2;
             ctx.stroke();
             ctx.setLineDash([]); // Reset
         }
