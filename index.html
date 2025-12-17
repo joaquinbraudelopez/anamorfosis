@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador Anamórfico (Versión Escritorio)</title>
+    <title>Generador Anamórfico (Con Altura)</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f4f4f9; color: #333; margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f4f4f9; color: #333; margin: 0; padding: 20px; }
         
-        /* Estilos pantalla */
         .no-print { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
         h1 { font-size: 1.5rem; color: #444; margin-bottom: 10px; }
         
@@ -15,76 +14,29 @@
         .btn { border: 2px solid #555; color: #555; background-color: white; padding: 8px 20px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
         .upload-btn-wrapper input[type=file] { font-size: 100px; position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; }
         
-        input[type="range"] { width: 100%; margin: 15px 0; }
+        input[type="range"] { width: 100%; margin: 10px 0; }
+        label { font-weight: bold; font-size: 0.9rem; display: block; margin-top: 15px; text-align: left; }
         
         button.print-btn { background: #007bff; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-top: 20px;}
         button.print-btn:hover { background: #0056b3; }
 
-        /* EL LIENZO EN PANTALLA */
         #canvas-container { margin-top: 20px; display: flex; justify-content: center; align-items: center; flex-direction: column; }
-        canvas { 
-            max-width: 90%; 
-            height: auto; 
-            border: 1px dashed #ccc; 
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
+        canvas { max-width: 90%; height: auto; border: 1px dashed #ccc; }
 
-        /* --- CONFIGURACIÓN DE IMPRESIÓN CORREGIDA --- */
         @media print {
-            /* 1. Elimina encabezados y pies de página automáticos del navegador */
-            @page {
-                margin: 0;
-                size: A4 portrait;
-            }
-
-            body, html { 
-                background: white; 
-                margin: 0; 
-                padding: 0; 
-                height: 100%; /* Forzar altura completa */
-                width: 100%;
-                /* Usar Flexbox para centrar perfectamente sin romper página */
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-
+            @page { size: A4 portrait; margin: 0; }
+            body, html { width: 100%; height: 100%; margin: 0; padding: 0; background: white; display: flex; justify-content: center; align-items: center; overflow: hidden; }
             .no-print { display: none !important; } 
-            
-            #canvas-container { 
-                /* Reseteamos posiciones absolutas que causaban el corte */
-                position: static; 
-                transform: none;
-                margin: 0;
-                padding: 0;
-                display: block;
-            }
-            
-            canvas {
-                width: 15cm !important; 
-                height: 15cm !important; 
-                border: none;
-                box-shadow: none;
-                display: block;
-            }
-
-            /* Marcas de corte */
-            #canvas-container::after {
-                content: "✂️ Recortar por el borde (Diámetro: 15cm)";
-                display: block;
-                text-align: center;
-                font-size: 10pt;
-                color: #999;
-                margin-top: 15px; /* Un poco de aire */
-            }
+            #canvas-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; page-break-inside: avoid; }
+            canvas { width: 15cm !important; height: 15cm !important; max-width: 15cm !important; border: none; display: block; }
         }
     </style>
 </head>
 <body>
 
 <div class="no-print">
-    <h1>🎨 Crea tu Regalo</h1>
-    <p>La imagen saldrá de <strong>15 cm</strong> con el espacio exacto para tu cilindro de <strong>6 cm</strong>.</p>
+    <h1>🎨 Generador con Altura</h1>
+    <p>Usa el control de "Altura" para subir la proyección en el cilindro.</p>
     
     <div class="upload-btn-wrapper">
         <button class="btn">📂 Seleccionar Foto</button>
@@ -92,14 +44,15 @@
     </div>
 
     <div id="controls" style="display:none;">
-        <label>🔍 Zoom / Encuadre</label>
+        <label>🔍 Zoom (Tamaño de la cara)</label>
         <input type="range" id="scale" min="50" max="250" value="100">
         
+        <label>⬆️ Altura (Subir imagen en el espejo)</label>
+        <input type="range" id="offset" min="0" max="60" value="0">
+        <small style="color:#666; display:block; text-align:left;">Esto aleja el dibujo de la base para que se refleje más arriba.</small>
+
         <br>
         <button class="print-btn" onclick="window.print()">🖨️ IMPRIMIR</button>
-        <p style="font-size: 0.85rem; margin-top:15px; background: #fff3cd; padding: 10px; border-radius: 5px; display: inline-block;">
-            ⚠️ <strong>Ojo:</strong> Al imprimir, elige escala <strong>"100%"</strong> o <strong>"Personalizado: 100"</strong>. <br>No uses "Ajustar a página".
-        </p>
     </div>
 </div>
 
@@ -112,14 +65,15 @@
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const scaleSlider = document.getElementById('scale');
+    const offsetSlider = document.getElementById('offset');
     const controlsDiv = document.getElementById('controls');
 
     let img = new Image();
     let isImageLoaded = false;
 
-    // --- MATEMÁTICA DEL CILINDRO ---
-    // Ratio = 6 / 15 = 0.4
+    // Constantes físicas
     const FIXED_HOLE_RATIO = 6 / 15; 
+    const SECTOR_ANGLE = Math.PI; 
 
     upload.addEventListener('change', (e) => {
         if(e.target.files && e.target.files[0]){
@@ -137,6 +91,7 @@
     });
 
     scaleSlider.addEventListener('input', draw);
+    offsetSlider.addEventListener('input', draw);
 
     function draw() {
         if (!isImageLoaded) return;
@@ -149,9 +104,11 @@
         const cy = size / 2;
         const radius = size / 2; 
         
+        // Limpiar
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, size, size);
 
+        // Leer imagen fuente
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = img.width;
         tempCanvas.height = img.height;
@@ -162,7 +119,17 @@
         const destImageData = ctx.createImageData(size, size);
         const data = destImageData.data;
 
+        // Cálculos de geometría
         const rInner = size * (FIXED_HOLE_RATIO / 2); 
+        
+        // --- AQUÍ ESTÁ LA MAGIA DEL OFFSET ---
+        // El offset es un porcentaje del espacio disponible en el papel
+        // Si offset es 0, empezamos en rInner.
+        // Si offset es alto, empezamos más lejos del centro.
+        const availableSpace = radius - rInner;
+        const offsetPct = offsetSlider.value / 100;
+        const rStart = rInner + (availableSpace * offsetPct * 0.8); // *0.8 para no salirnos del papel
+
         const zoom = scaleSlider.value / 100;
 
         for (let y = 0; y < size; y++) {
@@ -171,21 +138,32 @@
                 const dy = y - cy;
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                if (dist > radius || dist < rInner) continue;
+                // Zona prohibida (dentro del agujero O dentro de la zona de offset vacía)
+                if (dist > radius || dist < rStart) continue;
 
                 let angle = Math.atan2(dy, dx); 
-                angle = angle + Math.PI / 2; 
-                if (angle < 0) angle += 2 * Math.PI;
+                let adjustedAngle = angle - (Math.PI / 2);
                 
-                const u = (angle / (2 * Math.PI)) * img.width;
-                const distNormalizada = (dist - rInner) / (radius - rInner);
+                if (adjustedAngle < -Math.PI) adjustedAngle += 2 * Math.PI;
+                if (adjustedAngle > Math.PI) adjustedAngle -= 2 * Math.PI;
+
+                const halfSector = SECTOR_ANGLE / 2;
+                if (Math.abs(adjustedAngle) > halfSector) continue; 
+
+                // Mapeo
+                const anglePercent = (adjustedAngle + halfSector) / SECTOR_ANGLE;
+                const u = anglePercent * img.width;
+                
+                // Mapeamos desde rStart hasta radius
+                const distNormalizada = (dist - rStart) / (radius - rStart);
                 const v = (1 - distNormalizada) * img.height * zoom;
 
                 if (v < 0 || v >= img.height) continue;
 
-                const srcX = Math.floor(u);
-                const srcY = Math.floor(v);
-                const srcIndex = (srcY * img.width + srcX) * 4;
+                const safeX = Math.min(Math.max(Math.floor(u), 0), img.width - 1);
+                const safeY = Math.min(Math.max(Math.floor(v), 0), img.height - 1);
+
+                const srcIndex = (safeY * img.width + safeX) * 4;
                 const destIndex = (y * size + x) * 4;
 
                 data[destIndex] = sourceData.data[srcIndex];
@@ -197,23 +175,53 @@
 
         ctx.putImageData(destImageData, 0, 0);
         
+        // --- GUÍAS ---
+        // Círculo exterior
         ctx.beginPath();
         ctx.arc(cx, cy, radius - 2, 0, 2 * Math.PI);
-        ctx.strokeStyle = "#e0e0e0";
+        ctx.strokeStyle = "#eeeeee";
         ctx.lineWidth = 1;
         ctx.stroke();
 
+        // Círculo del cilindro (fijo en 6cm)
         ctx.beginPath();
         ctx.arc(cx, cy, rInner, 0, 2 * Math.PI);
         ctx.strokeStyle = "#cccccc";
         ctx.lineWidth = 2;
         ctx.stroke();
+
+        // Círculo de inicio de imagen (donde empieza el dibujo realmente)
+        // Solo lo dibujamos si hay offset, para que sepa que ahí empieza
+        if (offsetSlider.value > 5) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, rStart, 0, 2 * Math.PI); // Arco completo o parcial
+            ctx.strokeStyle = "#ffcccc"; // Rojo clarito
+            ctx.setLineDash([10, 10]);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset
+        }
         
-        ctx.fillStyle = "#ddd";
-        ctx.font = "60px Arial";
+        // Flecha guía interna (Muesca)
+        const arrowWidth = 280;
+        const arrowLength = 530;
+        const arrowTipY = cy + rInner;
+        const arrowBaseY = arrowTipY - arrowLength;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, arrowTipY); 
+        ctx.lineTo(cx - (arrowWidth/2), arrowBaseY); 
+        ctx.lineTo(cx + (arrowWidth/2), arrowBaseY); 
+        ctx.closePath();
+        
+        ctx.fillStyle = "#333";
+        ctx.fill();
+
+        ctx.fillStyle = "#ccc";
+        ctx.font = "40px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("Ø 6cm", cx, cy);
+        ctx.fillText("Ø 6cm", cx, cy - 80); 
     }
 </script>
 
