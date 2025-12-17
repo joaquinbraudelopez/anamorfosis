@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador A4 Full (Cilindro al Borde)</title>
+    <title>Generador A4 Full (Imagen Completa)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #333; color: #fff; margin: 0; padding: 20px; }
         
@@ -18,7 +18,7 @@
         button.print-btn { background: #28a745; color: white; border: none; padding: 15px 40px; font-size: 20px; border-radius: 50px; cursor: pointer; margin-top: 20px; font-weight: bold;}
         button.print-btn:hover { background: #218838; }
 
-        /* PREVISUALIZACIÓN EN PANTALLA */
+        /* PREVISUALIZACIÓN */
         #canvas-container { 
             margin-top: 20px; 
             background: #555; 
@@ -28,50 +28,26 @@
         }
         canvas { 
             background: white; 
-            max-width: 300px; /* Se ve pequeño en pantalla pero es A4 real */
+            max-width: 300px; 
             height: auto; 
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
 
         /* --- IMPRESIÓN A4 EXACTA --- */
         @media print {
-            @page { 
-                size: A4 portrait; 
-                margin: 0; 
-            }
-            body, html { 
-                margin: 0; 
-                padding: 0; 
-                background: white; 
-                width: 100%;
-                height: 100%;
-            }
+            @page { size: A4 portrait; margin: 0; }
+            body, html { margin: 0; padding: 0; background: white; width: 100%; height: 100%; }
             .no-print { display: none !important; } 
-            
-            #canvas-container { 
-                background: none; 
-                padding: 0; 
-                margin: 0; 
-                width: 100%; 
-                height: 100%; 
-                display: block; 
-            }
-            
-            canvas {
-                width: 210mm !important; 
-                height: 297mm !important; 
-                max-width: none;
-                box-shadow: none;
-                display: block;
-            }
+            #canvas-container { background: none; padding: 0; margin: 0; width: 100%; height: 100%; display: block; }
+            canvas { width: 210mm !important; height: 297mm !important; max-width: none; box-shadow: none; display: block; }
         }
     </style>
 </head>
 <body>
 
 <div class="no-print">
-    <h1>🚀 Modo A4 Completo</h1>
-    <p>La imagen usará toda la hoja. Coloca el cilindro en el semicírculo inferior.</p>
+    <h1>🚀 Modo A4 (Imagen Completa)</h1>
+    <p>La imagen ahora ocupa todo el abanico sin cortarse.</p>
     
     <div class="upload-btn-wrapper">
         <button class="btn">📂 1. Subir Foto</button>
@@ -79,7 +55,7 @@
     </div>
 
     <div id="controls" style="display:none;">
-        <label>🔍 Zoom (Tamaño)</label>
+        <label>🔍 Zoom (Ajustar tamaño)</label>
         <input type="range" id="scale" min="50" max="300" value="100">
         
         <label>⬆️ Altura (Alejar del cilindro)</label>
@@ -105,16 +81,10 @@
     let img = new Image();
     let isImageLoaded = false;
 
-    // --- GEOMETRÍA A4 REAL ---
-    // A4 es 210mm x 297mm.
-    // Cilindro es 60mm.
-    // Relación de pixeles para alta calidad (300 DPI aprox)
-    // Ancho = 2480 px, Alto = 3508 px
+    // GEOMETRÍA A4 ALTA CALIDAD
     const CANVAS_WIDTH = 2480;
     const CANVAS_HEIGHT = 3508;
-    
-    // El radio del cilindro (30mm) en relación al ancho de la hoja (210mm)
-    // 30 / 210 = 0.1428... del ancho total
+    // Radio del cilindro (30mm) proporcional al ancho A4 (210mm)
     const CYLINDER_RADIUS_PX = CANVAS_WIDTH * (30 / 210);
 
     upload.addEventListener('change', (e) => {
@@ -141,18 +111,16 @@
         canvas.width = CANVAS_WIDTH;
         canvas.height = CANVAS_HEIGHT;
         
-        // EL CENTRO MATEMÁTICO ESTÁ ABAJO AL MEDIO
+        // CENTRO MATEMÁTICO: ABAJO AL MEDIO
         const cx = CANVAS_WIDTH / 2;
-        const cy = CANVAS_HEIGHT; // Justo en el borde inferior de la hoja
+        const cy = CANVAS_HEIGHT; 
         
-        // El radio máximo es la diagonal hasta la esquina superior
+        // Distancia máxima posible (diagonal a la esquina superior)
         const maxRadius = Math.sqrt(Math.pow(CANVAS_WIDTH/2, 2) + Math.pow(CANVAS_HEIGHT, 2));
 
-        // Limpiar
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-        // Buffer imagen
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = img.width;
         tempCanvas.height = img.height;
@@ -163,50 +131,35 @@
         const destImageData = ctx.createImageData(CANVAS_WIDTH, CANVAS_HEIGHT);
         const data = destImageData.data;
 
-        // Cálculos
-        // rInner es el borde físico del cilindro
         const rInner = CYLINDER_RADIUS_PX; 
-        
-        // Offset: empujar la imagen hacia arriba
-        const offsetVal = offsetSlider.value * 10; // Multiplicador para dar más rango
+        const offsetVal = offsetSlider.value * 10; 
         const rStart = rInner + offsetVal;
-
         const zoom = scaleSlider.value / 100;
-        
-        // Ángulo del abanico: Usamos un poco menos de 180 para que no se deforme tanto en los bordes extremos
         const SECTOR_ANGLE = Math.PI * 0.9; 
 
         for (let y = 0; y < CANVAS_HEIGHT; y++) {
             for (let x = 0; x < CANVAS_WIDTH; x++) {
                 const dx = x - cx;
-                const dy = y - cy; // dy será negativo porque y < cy
+                const dy = y - cy; 
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                // Si estamos dentro del cilindro o antes del inicio de la imagen, saltar
                 if (dist < rStart) continue;
 
-                // Ángulo
-                // Math.atan2(dy, dx). Como dy es negativo (arriba del borde inferior), el ángulo va de -PI a 0.
-                // Queremos que el centro (x=cx) sea 0.
-                // atan2(dy, dx) -> -PI/2 es arriba (centro).
-                
                 let angle = Math.atan2(dy, dx); 
-                // Rotamos para que -PI/2 sea nuestro 0
                 let adjustedAngle = angle + (Math.PI / 2);
 
                 const halfSector = SECTOR_ANGLE / 2;
                 if (Math.abs(adjustedAngle) > halfSector) continue;
 
-                // Mapeo X (Ángulo -> Ancho imagen)
+                // Mapeo X
                 const anglePercent = (adjustedAngle + halfSector) / SECTOR_ANGLE;
                 const u = anglePercent * img.width;
                 
-                // Mapeo Y (Distancia -> Alto imagen)
-                // Aquí usamos una escala logarítmica suave o lineal. Vamos lineal por ahora.
-                // Mapeamos desde rStart hasta donde termine la hoja (aprox maxRadius)
-                const distNormalizada = (dist - rStart) / (CANVAS_HEIGHT - rInner); // Normalización aprox
+                // --- CORRECCIÓN DEL MAPEO Y (ALTURA) ---
+                // Ahora usamos maxRadius como límite, no CANVAS_HEIGHT.
+                // Esto evita que se corte la imagen en las esquinas lejanas.
+                const distNormalizada = (dist - rStart) / (maxRadius - rStart);
                 
-                // Invertimos: Cerca del cilindro = Abajo de la imagen (y=height)
                 const v = (1 - distNormalizada) * img.height * zoom;
 
                 if (v < 0 || v >= img.height) continue;
@@ -228,16 +181,15 @@
         
         // --- GUÍAS VISUALES ---
         
-        // 1. Dónde va el cilindro (Semicírculo gris abajo)
+        // 1. Zona del Cilindro (Gris)
         ctx.beginPath();
-        ctx.arc(cx, cy, rInner, Math.PI, 0); // Arco superior
+        ctx.arc(cx, cy, rInner, Math.PI, 0); 
         ctx.fillStyle = "#ddd";
         ctx.fill();
         ctx.lineWidth = 4;
         ctx.strokeStyle = "#999";
         ctx.stroke();
         
-        // Texto en el cilindro
         ctx.fillStyle = "#666";
         ctx.font = "bold 60px Arial";
         ctx.textAlign = "center";
@@ -245,17 +197,16 @@
         ctx.font = "40px Arial";
         ctx.fillText("AQUÍ", cx, cy - 30);
 
-        // 2. Muesca / Flecha de alineación (Invertida, apuntando al cilindro)
-        // La dibujamos sobre el borde del cilindro
+        // 2. Muesca / Flecha de alineación
         ctx.beginPath();
-        ctx.moveTo(cx, cy - rInner); // Punta tocando el borde del cilindro
+        ctx.moveTo(cx, cy - rInner); 
         ctx.lineTo(cx - 50, cy - rInner - 80);
         ctx.lineTo(cx + 50, cy - rInner - 80);
         ctx.closePath();
         ctx.fillStyle = "#333";
         ctx.fill();
 
-        // 3. Línea de inicio de imagen (si hay offset)
+        // 3. Línea de inicio (Offset)
         if (offsetSlider.value > 0) {
             ctx.beginPath();
             ctx.arc(cx, cy, rStart, Math.PI, 0);
