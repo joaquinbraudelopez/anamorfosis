@@ -3,221 +3,462 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador A4 Full (Imagen Completa)</title>
+    <title>Generador de Anamorfosis Cilíndrica</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #333; color: #fff; margin: 0; padding: 20px; }
-        
-        .no-print { max-width: 600px; margin: 0 auto; background: white; color: #333; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        h1 { margin-bottom: 10px; color: #222; }
-        
-        .upload-btn-wrapper { margin-bottom: 20px; }
-        .btn { border: 2px solid #555; background-color: #eee; padding: 8px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        
-        input[type="range"] { width: 100%; margin: 10px 0; }
-        
-        button.print-btn { background: #28a745; color: white; border: none; padding: 15px 40px; font-size: 20px; border-radius: 50px; cursor: pointer; margin-top: 20px; font-weight: bold;}
-        button.print-btn:hover { background: #218838; }
-
-        /* PREVISUALIZACIÓN */
-        #canvas-container { 
-            margin-top: 20px; 
-            background: #555; 
-            padding: 20px; 
-            display: inline-block;
-            border-radius: 10px;
-        }
-        canvas { 
-            background: white; 
-            max-width: 300px; 
-            height: auto; 
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
         }
 
-        /* --- IMPRESIÓN A4 EXACTA --- */
-        @media print {
-            @page { size: A4 portrait; margin: 0; }
-            body, html { margin: 0; padding: 0; background: white; width: 100%; height: 100%; }
-            .no-print { display: none !important; } 
-            #canvas-container { background: none; padding: 0; margin: 0; width: 100%; height: 100%; display: block; }
-            canvas { width: 210mm !important; height: 297mm !important; max-width: none; box-shadow: none; display: block; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+
+        p.subtitle {
+            color: #64748b;
+            margin-bottom: 2rem;
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .controls {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            flex: 1;
+            min-width: 300px;
+            max-width: 400px;
+        }
+
+        .preview-area {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            flex: 2;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 0.5rem;
+            border: 2px dashed #cbd5e1;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #e2e8f0;
+            background-image: linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee), 
+                              linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+
+        .value-display {
+            float: right;
+            color: var(--primary);
+            font-weight: normal;
+        }
+
+        .instructions {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #eff6ff;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: none;
+            margin: 10px auto;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-<div class="no-print">
-    <h1>🚀 Modo A4 (Imagen Completa)</h1>
-    <p>La imagen ahora ocupa todo el abanico sin cortarse.</p>
-    
-    <div class="upload-btn-wrapper">
-        <button class="btn">📂 1. Subir Foto</button>
-        <input type="file" id="upload" accept="image/*">
+    <h1>Anamorfosis Cilíndrica</h1>
+    <p class="subtitle">Modo de Precisión: Ajuste Automático al Círculo de 19cm</p>
+
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label>1. Subir Imagen</label>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+
+            <div class="control-group">
+                <label>Diámetro del Cilindro (cm) <span id="val-inner" class="value-display">6 cm</span></label>
+                <input type="range" id="cylinderDiameter" min="2" max="15" step="0.5" value="6">
+                <small style="color: #666">Ancho del agujero central.</small>
+            </div>
+
+            <div class="control-group">
+                <label>Tamaño Deseado Imagen (cm) <span id="val-outer" class="value-display">18 cm</span></label>
+                <input type="range" id="totalDiameter" min="10" max="25" step="0.5" value="18">
+                <small style="color: #666">Se ajustará automáticamente si excede los 19cm desplazados.</small>
+            </div>
+
+            <div class="control-group">
+                <label>Apertura del Arco <span id="val-angle" class="value-display">180°</span></label>
+                <input type="range" id="angleSpan" min="90" max="360" value="180">
+                <small style="color: #666">Generalmente 180° (semicírculo) es ideal.</small>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="invertImage" checked> Invertir imagen (Espejo)
+                </label>
+                <small style="color: #666">Necesario porque el espejo invierte la imagen horizontalmente.</small>
+            </div>
+
+            <button id="downloadBtn" style="display: none;">Descargar Resultado</button>
+            <div id="loader" class="loader"></div>
+        </div>
+
+        <div class="preview-area">
+            <p id="placeholderText" style="color: #94a3b8;">La vista previa aparecerá aquí...</p>
+            <canvas id="canvas"></canvas>
+        </div>
     </div>
 
-    <div id="controls" style="display:none;">
-        <label>🔍 Zoom (Ajustar tamaño)</label>
-        <input type="range" id="scale" min="50" max="300" value="100">
-        
-        <label>⬆️ Altura (Alejar del cilindro)</label>
-        <input type="range" id="offset" min="0" max="150" value="20">
-        
-        <br>
-        <button class="print-btn" onclick="window.print()">🖨️ IMPRIMIR</button>
+    <div class="container">
+        <div class="instructions">
+            <h3>Instrucciones de Impresión</h3>
+            <ol>
+                <li>Descarga la imagen generada.</li>
+                <li>Imprímela en una hoja <strong>tamaño A4</strong> al 100% de escala.</li>
+                <li><strong>El círculo exterior gris</strong> es tu límite de 19cm (para recortar la hoja).</li>
+                <li><strong>El círculo interior verde</strong> es donde debes poner el cilindro.</li>
+                <li>Notarás que la imagen se ha ajustado para caber perfectamente dentro del círculo de recorte.</li>
+            </ol>
+        </div>
     </div>
-</div>
 
-<div id="canvas-container">
-    <canvas id="canvas"></canvas>
-</div>
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const cylinderDiameterInput = document.getElementById('cylinderDiameter');
+        const totalDiameterInput = document.getElementById('totalDiameter');
+        const angleSpanInput = document.getElementById('angleSpan');
+        const invertImageInput = document.getElementById('invertImage');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const loader = document.getElementById('loader');
+        const placeholderText = document.getElementById('placeholderText');
 
-<script>
-    const upload = document.getElementById('upload');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const scaleSlider = document.getElementById('scale');
-    const offsetSlider = document.getElementById('offset');
-    const controlsDiv = document.getElementById('controls');
+        // A4 Paper definition (Landscape width 29.7cm, but usually printers have margins)
+        const CANVAS_WIDTH_PX = 1000;
+        const A4_WIDTH_CM = 21.0;
+        const PX_PER_CM = CANVAS_WIDTH_PX / A4_WIDTH_CM;
 
-    let img = new Image();
-    let isImageLoaded = false;
+        // Display value updaters
+        const updateDisplays = () => {
+            document.getElementById('val-inner').textContent = cylinderDiameterInput.value + ' cm';
+            document.getElementById('val-outer').textContent = totalDiameterInput.value + ' cm';
+            document.getElementById('val-angle').textContent = angleSpanInput.value + '°';
+        };
 
-    // GEOMETRÍA A4 ALTA CALIDAD
-    const CANVAS_WIDTH = 2480;
-    const CANVAS_HEIGHT = 3508;
-    // Radio del cilindro (30mm) proporcional al ancho A4 (210mm)
-    const CYLINDER_RADIUS_PX = CANVAS_WIDTH * (30 / 210);
+        let sourceImage = null;
 
-    upload.addEventListener('change', (e) => {
-        if(e.target.files && e.target.files[0]){
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                img.onload = () => {
-                    isImageLoaded = true;
-                    controlsDiv.style.display = 'block';
-                    draw();
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    sourceImage = new Image();
+                    sourceImage.onload = () => {
+                        placeholderText.style.display = 'none';
+                        processImage();
+                    };
+                    sourceImage.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        [cylinderDiameterInput, totalDiameterInput, angleSpanInput, invertImageInput].forEach(input => {
+            input.addEventListener('input', () => {
+                // Ensure Outer > Inner
+                if(parseFloat(totalDiameterInput.value) <= parseFloat(cylinderDiameterInput.value)) {
+                    totalDiameterInput.value = parseFloat(cylinderDiameterInput.value) + 1;
                 }
-                img.src = event.target.result;
-            }
-            reader.readAsDataURL(e.target.files[0]);
-        }
-    });
+                updateDisplays();
+                if (sourceImage) processImage();
+            });
+        });
 
-    scaleSlider.addEventListener('input', draw);
-    offsetSlider.addEventListener('input', draw);
+        function processImage() {
+            if (!sourceImage) return;
 
-    function draw() {
-        if (!isImageLoaded) return;
+            loader.style.display = 'block';
+            downloadBtn.style.display = 'none';
 
-        canvas.width = CANVAS_WIDTH;
-        canvas.height = CANVAS_HEIGHT;
-        
-        // CENTRO MATEMÁTICO: ABAJO AL MEDIO
-        const cx = CANVAS_WIDTH / 2;
-        const cy = CANVAS_HEIGHT; 
-        
-        // Distancia máxima posible (diagonal a la esquina superior)
-        const maxRadius = Math.sqrt(Math.pow(CANVAS_WIDTH/2, 2) + Math.pow(CANVAS_HEIGHT, 2));
+            requestAnimationFrame(() => {
+                // Dimensions requested
+                const reqTotalDiamCm = parseFloat(totalDiameterInput.value);
+                const cylDiamCm = parseFloat(cylinderDiameterInput.value);
+                const spanDeg = parseInt(angleSpanInput.value);
 
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = img.width;
-        tempCanvas.height = img.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(img, 0, 0);
-        const sourceData = tempCtx.getImageData(0, 0, img.width, img.height);
-
-        const destImageData = ctx.createImageData(CANVAS_WIDTH, CANVAS_HEIGHT);
-        const data = destImageData.data;
-
-        const rInner = CYLINDER_RADIUS_PX; 
-        const offsetVal = offsetSlider.value * 10; 
-        const rStart = rInner + offsetVal;
-        const zoom = scaleSlider.value / 100;
-        const SECTOR_ANGLE = Math.PI * 0.9; 
-
-        for (let y = 0; y < CANVAS_HEIGHT; y++) {
-            for (let x = 0; x < CANVAS_WIDTH; x++) {
-                const dx = x - cx;
-                const dy = y - cy; 
-                const dist = Math.sqrt(dx*dx + dy*dy);
+                // --- CONSTRAINT LOGIC ---
+                // The constraint is the 19cm circle centered at the ADJUSTMENT point.
+                // The image is generated at the GEOMETRIC center.
+                // Distance between centers (offset) is ~1.8cm.
+                // Therefore, Max Image Radius + Offset must be <= 19cm Radius (9.5cm).
                 
-                if (dist < rStart) continue;
-
-                let angle = Math.atan2(dy, dx); 
-                let adjustedAngle = angle + (Math.PI / 2);
-
-                const halfSector = SECTOR_ANGLE / 2;
-                if (Math.abs(adjustedAngle) > halfSector) continue;
-
-                // Mapeo X
-                const anglePercent = (adjustedAngle + halfSector) / SECTOR_ANGLE;
-                const u = anglePercent * img.width;
+                const offsetCm = 1.8; // The visual shift
+                const limitRadiusCm = 9.5; // 19cm / 2
                 
-                // --- CORRECCIÓN DEL MAPEO Y (ALTURA) ---
-                // Ahora usamos maxRadius como límite, no CANVAS_HEIGHT.
-                // Esto evita que se corte la imagen en las esquinas lejanas.
-                const distNormalizada = (dist - rStart) / (maxRadius - rStart);
+                // Max radius the image can have from its geometric center to fit in the shifted circle
+                const maxAllowedImageRadiusCm = limitRadiusCm - offsetCm; 
+                const maxAllowedImageDiamCm = maxAllowedImageRadiusCm * 2;
+
+                // Effective diameter to use for calculation
+                let effTotalDiamCm = reqTotalDiamCm;
+                let wasClamped = false;
+
+                if ((reqTotalDiamCm / 2) > maxAllowedImageRadiusCm) {
+                    effTotalDiamCm = maxAllowedImageDiamCm * 2; // Actually we compare radius. 
+                    // Wait, diameter is radius * 2. 
+                    // If reqRadius > maxAllowed, then reqDiameter > maxAllowed * 2.
+                    effTotalDiamCm = maxAllowedImageRadiusCm * 2;
+                    wasClamped = true;
+                }
                 
-                const v = (1 - distNormalizada) * img.height * zoom;
+                // --- CANVAS SETUP ---
+                const canvasSize = CANVAS_WIDTH_PX; 
+                const marginY = 600; 
+                
+                canvas.width = canvasSize;
+                canvas.height = canvasSize + marginY;
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                if (v < 0 || v >= img.height) continue;
+                // Source Image
+                const srcCanvas = document.createElement('canvas');
+                srcCanvas.width = sourceImage.width;
+                srcCanvas.height = sourceImage.height;
+                const srcCtx = srcCanvas.getContext('2d');
+                
+                srcCtx.save();
+                if (invertImageInput.checked) {
+                    srcCtx.translate(sourceImage.width, 0);
+                    srcCtx.scale(-1, 1);
+                }
+                srcCtx.drawImage(sourceImage, 0, 0);
+                srcCtx.restore();
 
-                const safeX = Math.min(Math.max(Math.floor(u), 0), img.width - 1);
-                const safeY = Math.min(Math.max(Math.floor(v), 0), img.height - 1);
+                const srcData = srcCtx.getImageData(0, 0, sourceImage.width, sourceImage.height);
+                const destImageData = ctx.createImageData(canvas.width, canvas.height);
 
-                const srcIndex = (safeY * img.width + safeX) * 4;
-                const destIndex = (y * CANVAS_WIDTH + x) * 4;
+                // Geometry
+                const cx = canvas.width / 2;
+                const cy = (canvas.width / 2) + 50; // Geometric Center
+                
+                // Radii in pixels
+                const rInner = (cylDiamCm / 2) * PX_PER_CM;
+                const rOuter = (effTotalDiamCm / 2) * PX_PER_CM; // Use constrained radius
 
-                data[destIndex] = sourceData.data[srcIndex];
-                data[destIndex + 1] = sourceData.data[srcIndex + 1];
-                data[destIndex + 2] = sourceData.data[srcIndex + 2];
-                data[destIndex + 3] = 255;
-            }
+                const angleCenter = -Math.PI / 2;
+                const halfSpan = (spanDeg * Math.PI / 180) / 2;
+                const thetaStart = angleCenter - halfSpan;
+                const thetaEnd = angleCenter + halfSpan;
+
+                // Pixel Loop
+                const data = destImageData.data;
+                const sData = srcData.data;
+                const sw = sourceImage.width;
+                const sh = sourceImage.height;
+
+                for (let y = 0; y < canvas.height; y++) {
+                    for (let x = 0; x < canvas.width; x++) {
+                        const dx = x - cx;
+                        const dy = y - cy;
+                        
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const angle = Math.atan2(dy, dx);
+
+                        if (distance >= rInner && distance <= rOuter && angle >= thetaStart && angle <= thetaEnd) {
+                            
+                            const normalizedAngle = (angle - thetaStart) / (thetaEnd - thetaStart);
+                            const normalizedRadius = (distance - rInner) / (rOuter - rInner);
+                            const srcYFactor = 1 - normalizedRadius; 
+                            
+                            const sx = Math.floor(normalizedAngle * sw);
+                            const sy = Math.floor(srcYFactor * sh);
+
+                            const safeSx = Math.min(Math.max(sx, 0), sw - 1);
+                            const safeSy = Math.min(Math.max(sy, 0), sh - 1);
+
+                            const destIndex = (y * canvas.width + x) * 4;
+                            const srcIndex = (safeSy * sw + safeSx) * 4;
+
+                            data[destIndex] = sData[srcIndex];
+                            data[destIndex + 1] = sData[srcIndex + 1];
+                            data[destIndex + 2] = sData[srcIndex + 2];
+                            data[destIndex + 3] = sData[srcIndex + 3];
+                        } else {
+                            const destIndex = (y * canvas.width + x) * 4;
+                            data[destIndex] = 255;
+                            data[destIndex + 1] = 255;
+                            data[destIndex + 2] = 255;
+                            data[destIndex + 3] = 255;
+                        }
+                    }
+                }
+
+                ctx.putImageData(destImageData, 0, 0);
+
+                // --- VISUAL GUIDES ---
+
+                // Visual Center Calculation
+                const offsetPixels = offsetCm * PX_PER_CM; 
+                const visualCenterY = cy + offsetPixels;
+
+                // 1. Arrow
+                ctx.beginPath();
+                ctx.moveTo(cx, cy + rInner); 
+                ctx.lineTo(cx, visualCenterY);
+                ctx.strokeStyle = '#ef4444'; 
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(cx - 5, visualCenterY - 5);
+                ctx.lineTo(cx, visualCenterY);
+                ctx.lineTo(cx + 5, visualCenterY - 5);
+                ctx.fillStyle = '#ef4444';
+                ctx.fill();
+
+                // 2. GREEN CIRCLE (6cm)
+                const radius6cm = (3 * PX_PER_CM); 
+                ctx.beginPath();
+                ctx.arc(cx, visualCenterY, radius6cm, 0, Math.PI * 2);
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // 3. GREY CIRCLE (19cm - CONSTRAINT)
+                const radius19cm = (limitRadiusCm * PX_PER_CM); 
+                ctx.beginPath();
+                ctx.arc(cx, visualCenterY, radius19cm, 0, Math.PI * 2);
+                ctx.strokeStyle = '#64748b'; 
+                ctx.lineWidth = 2;
+                ctx.setLineDash([10, 10]); 
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 4. Labels
+                ctx.fillStyle = '#15803d'; 
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                ctx.fillText('AJUSTE', cx, visualCenterY - 10);
+                ctx.font = '12px Arial';
+                ctx.fillText('VISUAL', cx, visualCenterY + 5);
+                
+                if (wasClamped) {
+                    ctx.fillStyle = '#eab308'; // Warning yellow/orange
+                    ctx.font = 'bold 16px Arial';
+                    // Draw message at the top of the canvas
+                    ctx.fillText('⚠️ Imagen reducida para caber en 19cm', cx, 30);
+                    
+                    // Also update the value display to show truth
+                    document.getElementById('val-outer').textContent = effTotalDiamCm.toFixed(1) + ' cm (Ajustado)';
+                    document.getElementById('val-outer').style.color = '#d97706';
+                } else {
+                    document.getElementById('val-outer').style.color = '#2563eb';
+                }
+
+                loader.style.display = 'none';
+                downloadBtn.style.display = 'block';
+            });
         }
 
-        ctx.putImageData(destImageData, 0, 0);
-        
-        // --- GUÍAS VISUALES ---
-        
-        // 1. Zona del Cilindro (Gris)
-        ctx.beginPath();
-        ctx.arc(cx, cy, rInner, Math.PI, 0); 
-        ctx.fillStyle = "#ddd";
-        ctx.fill();
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = "#999";
-        ctx.stroke();
-        
-        ctx.fillStyle = "#666";
-        ctx.font = "bold 60px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("CILINDRO", cx, cy - 80);
-        ctx.font = "40px Arial";
-        ctx.fillText("AQUÍ", cx, cy - 30);
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'anamorfosis-ajustada.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
 
-        // 2. Muesca / Flecha de alineación
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - rInner); 
-        ctx.lineTo(cx - 50, cy - rInner - 80);
-        ctx.lineTo(cx + 50, cy - rInner - 80);
-        ctx.closePath();
-        ctx.fillStyle = "#333";
-        ctx.fill();
-
-        // 3. Línea de inicio (Offset)
-        if (offsetSlider.value > 0) {
-            ctx.beginPath();
-            ctx.arc(cx, cy, rStart, Math.PI, 0);
-            ctx.strokeStyle = "#ffaaaa";
-            ctx.setLineDash([20, 20]);
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-    }
-</script>
-
+        updateDisplays();
+    </script>
 </body>
 </html>
