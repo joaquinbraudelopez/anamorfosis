@@ -151,14 +151,19 @@
 </head>
 <body>
 
-    <h1>Anamorfosis Cilíndrica</h1>
-    <p class="subtitle">Modo de Precisión: Ajuste Automático al Círculo de 19cm</p>
+    <h1>Anamorfosis Cilíndrica Doble</h1>
+    <p class="subtitle">Crea imágenes opuestas con simetría de perspectiva corregida.</p>
 
     <div class="container">
         <div class="controls">
             <div class="control-group">
-                <label>1. Subir Imagen</label>
+                <label>1. Imagen Principal (Arriba)</label>
                 <input type="file" id="imageInput" accept="image/*">
+            </div>
+
+            <div class="control-group">
+                <label>2. Imagen Opuesta (Abajo) <small style="font-weight:normal; color:#666">(Opcional)</small></label>
+                <input type="file" id="imageInput2" accept="image/*">
             </div>
 
             <div class="control-group">
@@ -175,13 +180,13 @@
 
             <div class="control-group">
                 <label>Apertura del Arco <span id="val-angle" class="value-display">180°</span></label>
-                <input type="range" id="angleSpan" min="90" max="360" value="180">
-                <small style="color: #666">Generalmente 180° (semicírculo) es ideal.</small>
+                <input type="range" id="angleSpan" min="60" max="180" value="180">
+                <small style="color: #666">Si usas 2 imágenes, máx 180°.</small>
             </div>
             
             <div class="control-group">
                 <label>
-                    <input type="checkbox" id="invertImage" checked> Invertir imagen (Espejo)
+                    <input type="checkbox" id="invertImage" checked> Invertir ambas (Espejo)
                 </label>
                 <small style="color: #666">Necesario porque el espejo invierte la imagen horizontalmente.</small>
             </div>
@@ -202,15 +207,16 @@
             <ol>
                 <li>Descarga la imagen generada.</li>
                 <li>Imprímela en una hoja <strong>tamaño A4</strong> al 100% de escala.</li>
-                <li><strong>El círculo exterior gris</strong> es tu límite de 19cm (para recortar la hoja).</li>
-                <li><strong>El círculo interior verde</strong> es donde debes poner el cilindro.</li>
-                <li>Notarás que la imagen se ha ajustado para caber perfectamente dentro del círculo de recorte.</li>
+                <li><strong>El círculo exterior gris</strong> es el límite de 19cm.</li>
+                <li><strong>El círculo interior verde</strong> (en el centro) es donde debes poner el cilindro.</li>
+                <li>Ahora ambas imágenes están separadas simétricamente para que el truco funcione igual de bien de los dos lados.</li>
             </ol>
         </div>
     </div>
 
     <script>
         const imageInput = document.getElementById('imageInput');
+        const imageInput2 = document.getElementById('imageInput2');
         const cylinderDiameterInput = document.getElementById('cylinderDiameter');
         const totalDiameterInput = document.getElementById('totalDiameter');
         const angleSpanInput = document.getElementById('angleSpan');
@@ -234,74 +240,76 @@
         };
 
         let sourceImage = null;
+        let sourceImage2 = null;
 
-        imageInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
+        const handleImageUpload = (file, isSecond = false) => {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    sourceImage = new Image();
-                    sourceImage.onload = () => {
-                        placeholderText.style.display = 'none';
+                    const img = new Image();
+                    img.onload = () => {
+                        if (isSecond) {
+                            sourceImage2 = img;
+                        } else {
+                            sourceImage = img;
+                            placeholderText.style.display = 'none';
+                        }
                         processImage();
                     };
-                    sourceImage.src = event.target.result;
+                    img.src = event.target.result;
                 };
                 reader.readAsDataURL(file);
             }
-        });
+        };
+
+        imageInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], false));
+        imageInput2.addEventListener('change', (e) => handleImageUpload(e.target.files[0], true));
 
         [cylinderDiameterInput, totalDiameterInput, angleSpanInput, invertImageInput].forEach(input => {
             input.addEventListener('input', () => {
-                // Ensure Outer > Inner
                 if(parseFloat(totalDiameterInput.value) <= parseFloat(cylinderDiameterInput.value)) {
                     totalDiameterInput.value = parseFloat(cylinderDiameterInput.value) + 1;
                 }
                 updateDisplays();
-                if (sourceImage) processImage();
+                if (sourceImage || sourceImage2) processImage();
             });
         });
 
         function processImage() {
-            if (!sourceImage) return;
+            if (!sourceImage && !sourceImage2) return;
 
             loader.style.display = 'block';
             downloadBtn.style.display = 'none';
 
             requestAnimationFrame(() => {
-                // Dimensions requested
                 const reqTotalDiamCm = parseFloat(totalDiameterInput.value);
                 const cylDiamCm = parseFloat(cylinderDiameterInput.value);
                 const spanDeg = parseInt(angleSpanInput.value);
 
-                // --- CONSTRAINT LOGIC ---
-                // The constraint is the 19cm circle centered at the ADJUSTMENT point.
-                // The image is generated at the GEOMETRIC center.
-                // Distance between centers (offset) is ~1.8cm.
-                // Therefore, Max Image Radius + Offset must be <= 19cm Radius (9.5cm).
+                // --- GEOMETRY & CONSTRAINTS ---
+                // We have a "Visual Center" (where cylinder goes, Green Circle).
+                // Image 1 (Top) is generated from a geometric center ABOVE the visual center.
+                // Image 2 (Bottom) is generated from a geometric center BELOW the visual center.
+                // This ensures symmetry in the "visual adjustment" trick.
                 
-                const offsetCm = 1.8; // The visual shift
-                const limitRadiusCm = 9.5; // 19cm / 2
+                const offsetCm = 1.8; // Distance from Geometric Center to Visual Center
+                const offsetPx = offsetCm * PX_PER_CM;
+                const limitRadiusCm = 9.5; // 19cm / 2 constraint around Visual Center
                 
-                // Max radius the image can have from its geometric center to fit in the shifted circle
+                // Max radius constraint applied to BOTH images
                 const maxAllowedImageRadiusCm = limitRadiusCm - offsetCm; 
-                const maxAllowedImageDiamCm = maxAllowedImageRadiusCm * 2;
-
-                // Effective diameter to use for calculation
+                
                 let effTotalDiamCm = reqTotalDiamCm;
                 let wasClamped = false;
 
                 if ((reqTotalDiamCm / 2) > maxAllowedImageRadiusCm) {
-                    effTotalDiamCm = maxAllowedImageDiamCm * 2; // Actually we compare radius. 
-                    // Wait, diameter is radius * 2. 
-                    // If reqRadius > maxAllowed, then reqDiameter > maxAllowed * 2.
-                    effTotalDiamCm = maxAllowedImageRadiusCm * 2;
+                    effTotalDiamCm = maxAllowedImageRadiusCm * 2; 
                     wasClamped = true;
                 }
                 
                 // --- CANVAS SETUP ---
                 const canvasSize = CANVAS_WIDTH_PX; 
-                const marginY = 600; 
+                const marginY = 800; // Increased to fit the shifted bottom image
                 
                 canvas.width = canvasSize;
                 canvas.height = canvasSize + marginY;
@@ -309,75 +317,121 @@
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // Source Image
-                const srcCanvas = document.createElement('canvas');
-                srcCanvas.width = sourceImage.width;
-                srcCanvas.height = sourceImage.height;
-                const srcCtx = srcCanvas.getContext('2d');
-                
-                srcCtx.save();
-                if (invertImageInput.checked) {
-                    srcCtx.translate(sourceImage.width, 0);
-                    srcCtx.scale(-1, 1);
-                }
-                srcCtx.drawImage(sourceImage, 0, 0);
-                srcCtx.restore();
+                // Prepare source data
+                const getSourceData = (img) => {
+                    if (!img) return null;
+                    const c = document.createElement('canvas');
+                    c.width = img.width;
+                    c.height = img.height;
+                    const cx = c.getContext('2d');
+                    cx.save();
+                    if (invertImageInput.checked) {
+                        cx.translate(img.width, 0);
+                        cx.scale(-1, 1);
+                    }
+                    cx.drawImage(img, 0, 0);
+                    cx.restore();
+                    return {
+                        data: cx.getImageData(0, 0, img.width, img.height).data,
+                        width: img.width,
+                        height: img.height
+                    };
+                };
 
-                const srcData = srcCtx.getImageData(0, 0, sourceImage.width, sourceImage.height);
+                const src1 = getSourceData(sourceImage);
+                const src2 = getSourceData(sourceImage2);
                 const destImageData = ctx.createImageData(canvas.width, canvas.height);
 
-                // Geometry
-                const cx = canvas.width / 2;
-                const cy = (canvas.width / 2) + 50; // Geometric Center
+                // --- CENTERS DEFINITION ---
                 
-                // Radii in pixels
+                // Reference Y (Top Geometric Center)
+                const cy1 = (canvas.width / 2) + 50; 
+                
+                // Visual Center (Green Circle) is offset DOWN from Top Center
+                const visualCenterY = cy1 + offsetPx;
+                
+                // Bottom Geometric Center is offset DOWN from Visual Center
+                // So it is 2 * offset down from cy1
+                const cy2 = visualCenterY + offsetPx;
+
+                const cx = canvas.width / 2;
+                
+                // Radii
                 const rInner = (cylDiamCm / 2) * PX_PER_CM;
-                const rOuter = (effTotalDiamCm / 2) * PX_PER_CM; // Use constrained radius
+                const rOuter = (effTotalDiamCm / 2) * PX_PER_CM;
 
-                const angleCenter = -Math.PI / 2;
-                const halfSpan = (spanDeg * Math.PI / 180) / 2;
-                const thetaStart = angleCenter - halfSpan;
-                const thetaEnd = angleCenter + halfSpan;
+                // Angles
+                const halfSpanRad = (spanDeg * Math.PI / 180) / 2;
+                const center1 = -Math.PI / 2; // Top
+                const center2 = Math.PI / 2;  // Bottom
 
-                // Pixel Loop
                 const data = destImageData.data;
-                const sData = srcData.data;
-                const sw = sourceImage.width;
-                const sh = sourceImage.height;
+
+                // Map Pixel Function
+                const mapPixel = (angle, distance, centerAngle, src) => {
+                    const normalizedAngle = (angle - (centerAngle - halfSpanRad)) / (2 * halfSpanRad);
+                    const normalizedRadius = (distance - rInner) / (rOuter - rInner);
+                    const srcYFactor = 1 - normalizedRadius; 
+                    
+                    const sx = Math.floor(normalizedAngle * src.width);
+                    const sy = Math.floor(srcYFactor * src.height);
+
+                    const safeSx = Math.min(Math.max(sx, 0), src.width - 1);
+                    const safeSy = Math.min(Math.max(sy, 0), src.height - 1);
+
+                    return (safeSy * src.width + safeSx) * 4;
+                };
 
                 for (let y = 0; y < canvas.height; y++) {
                     for (let x = 0; x < canvas.width; x++) {
                         const dx = x - cx;
-                        const dy = y - cy;
                         
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        const angle = Math.atan2(dy, dx);
+                        // We need to calculate distances relative to BOTH centers
+                        const dy1 = y - cy1;
+                        const dist1 = Math.sqrt(dx*dx + dy1*dy1);
+                        const ang1 = Math.atan2(dy1, dx);
 
-                        if (distance >= rInner && distance <= rOuter && angle >= thetaStart && angle <= thetaEnd) {
-                            
-                            const normalizedAngle = (angle - thetaStart) / (thetaEnd - thetaStart);
-                            const normalizedRadius = (distance - rInner) / (rOuter - rInner);
-                            const srcYFactor = 1 - normalizedRadius; 
-                            
-                            const sx = Math.floor(normalizedAngle * sw);
-                            const sy = Math.floor(srcYFactor * sh);
+                        const dy2 = y - cy2;
+                        const dist2 = Math.sqrt(dx*dx + dy2*dy2);
+                        const ang2 = Math.atan2(dy2, dx);
 
-                            const safeSx = Math.min(Math.max(sx, 0), sw - 1);
-                            const safeSy = Math.min(Math.max(sy, 0), sh - 1);
+                        const destIndex = (y * canvas.width + x) * 4;
+                        let drawn = false;
 
-                            const destIndex = (y * canvas.width + x) * 4;
-                            const srcIndex = (safeSy * sw + safeSx) * 4;
+                        // 1. Try Image 1 (Top) using cy1
+                        if (src1 && dist1 >= rInner && dist1 <= rOuter) {
+                            let diff1 = ang1 - center1;
+                            while (diff1 <= -Math.PI) diff1 += 2*Math.PI;
+                            while (diff1 > Math.PI) diff1 -= 2*Math.PI;
 
-                            data[destIndex] = sData[srcIndex];
-                            data[destIndex + 1] = sData[srcIndex + 1];
-                            data[destIndex + 2] = sData[srcIndex + 2];
-                            data[destIndex + 3] = sData[srcIndex + 3];
-                        } else {
-                            const destIndex = (y * canvas.width + x) * 4;
-                            data[destIndex] = 255;
-                            data[destIndex + 1] = 255;
-                            data[destIndex + 2] = 255;
-                            data[destIndex + 3] = 255;
+                            if (Math.abs(diff1) <= halfSpanRad) {
+                                const sIdx = mapPixel(ang1, dist1, center1, src1);
+                                data[destIndex] = src1.data[sIdx];
+                                data[destIndex+1] = src1.data[sIdx+1];
+                                data[destIndex+2] = src1.data[sIdx+2];
+                                data[destIndex+3] = src1.data[sIdx+3];
+                                drawn = true;
+                            }
+                        }
+
+                        // 2. Try Image 2 (Bottom) using cy2 (Only if not drawn yet)
+                        if (!drawn && src2 && dist2 >= rInner && dist2 <= rOuter) {
+                            let diff2 = ang2 - center2;
+                            while (diff2 <= -Math.PI) diff2 += 2*Math.PI;
+                            while (diff2 > Math.PI) diff2 -= 2*Math.PI;
+
+                            if (Math.abs(diff2) <= halfSpanRad) {
+                                const sIdx = mapPixel(ang2, dist2, center2, src2);
+                                data[destIndex] = src2.data[sIdx];
+                                data[destIndex+1] = src2.data[sIdx+1];
+                                data[destIndex+2] = src2.data[sIdx+2];
+                                data[destIndex+3] = src2.data[sIdx+3];
+                                drawn = true;
+                            }
+                        }
+
+                        if (!drawn) {
+                            data[destIndex] = 255; data[destIndex+1] = 255; data[destIndex+2] = 255; data[destIndex+3] = 255;
                         }
                     }
                 }
@@ -386,26 +440,21 @@
 
                 // --- VISUAL GUIDES ---
 
-                // Visual Center Calculation
-                const offsetPixels = offsetCm * PX_PER_CM; 
-                const visualCenterY = cy + offsetPixels;
-
-                // 1. Arrow
+                // 1. Arrow Top
                 ctx.beginPath();
-                ctx.moveTo(cx, cy + rInner); 
+                ctx.moveTo(cx, cy1 + rInner); 
                 ctx.lineTo(cx, visualCenterY);
                 ctx.strokeStyle = '#ef4444'; 
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 1;
                 ctx.stroke();
 
+                // 2. Arrow Bottom (Symmetric)
                 ctx.beginPath();
-                ctx.moveTo(cx - 5, visualCenterY - 5);
+                ctx.moveTo(cx, cy2 - rInner); 
                 ctx.lineTo(cx, visualCenterY);
-                ctx.lineTo(cx + 5, visualCenterY - 5);
-                ctx.fillStyle = '#ef4444';
-                ctx.fill();
+                ctx.stroke();
 
-                // 2. GREEN CIRCLE (6cm)
+                // 3. GREEN CIRCLE (6cm) at VISUAL CENTER
                 const radius6cm = (3 * PX_PER_CM); 
                 ctx.beginPath();
                 ctx.arc(cx, visualCenterY, radius6cm, 0, Math.PI * 2);
@@ -413,7 +462,7 @@
                 ctx.lineWidth = 3;
                 ctx.stroke();
 
-                // 3. GREY CIRCLE (19cm - CONSTRAINT)
+                // 4. GREY CIRCLE (19cm - CONSTRAINT) at VISUAL CENTER
                 const radius19cm = (limitRadiusCm * PX_PER_CM); 
                 ctx.beginPath();
                 ctx.arc(cx, visualCenterY, radius19cm, 0, Math.PI * 2);
@@ -423,23 +472,19 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                // 4. Labels
+                // 5. Labels
                 ctx.fillStyle = '#15803d'; 
                 ctx.font = 'bold 14px Arial';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
-                ctx.fillText('AJUSTE', cx, visualCenterY - 10);
-                ctx.font = '12px Arial';
-                ctx.fillText('VISUAL', cx, visualCenterY + 5);
+                ctx.fillText('COLOCAR', cx, visualCenterY - 10);
+                ctx.fillText('CILINDRO', cx, visualCenterY + 10);
                 
                 if (wasClamped) {
-                    ctx.fillStyle = '#eab308'; // Warning yellow/orange
+                    ctx.fillStyle = '#eab308';
                     ctx.font = 'bold 16px Arial';
-                    // Draw message at the top of the canvas
-                    ctx.fillText('⚠️ Imagen reducida para caber en 19cm', cx, 30);
-                    
-                    // Also update the value display to show truth
+                    ctx.fillText('⚠️ Imágenes reducidas para caber en 19cm', cx, 30);
                     document.getElementById('val-outer').textContent = effTotalDiamCm.toFixed(1) + ' cm (Ajustado)';
                     document.getElementById('val-outer').style.color = '#d97706';
                 } else {
@@ -453,7 +498,7 @@
 
         downloadBtn.addEventListener('click', () => {
             const link = document.createElement('a');
-            link.download = 'anamorfosis-ajustada.png';
+            link.download = 'anamorfosis-simetrica.png';
             link.href = canvas.toDataURL();
             link.click();
         });
