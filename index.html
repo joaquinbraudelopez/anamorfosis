@@ -3,147 +3,504 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador A4 Definitivo</title>
+    <title>Generador de Anamorfosis Cilíndrica</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #333; color: #fff; margin: 0; padding: 20px; }
-        
-        .no-print { max-width: 600px; margin: 0 auto; background: white; color: #333; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        h1 { margin-bottom: 10px; color: #222; }
-        
-        .upload-btn-wrapper { margin-bottom: 20px; }
-        .btn { border: 2px solid #555; background-color: #eee; padding: 8px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        
-        input[type="range"] { width: 100%; margin: 10px 0; }
-        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.9em;}
-        
-        button.print-btn { background: #28a745; color: white; border: none; padding: 15px 40px; font-size: 20px; border-radius: 50px; cursor: pointer; margin-top: 20px; font-weight: bold;}
-        button.print-btn:hover { background: #218838; }
-
-        #canvas-container { 
-            margin-top: 20px; 
-            background: #555; 
-            padding: 20px; 
-            display: inline-block;
-            border-radius: 10px;
-        }
-        canvas { 
-            background: white; 
-            max-width: 300px; 
-            height: auto; 
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
         }
 
-        @media print {
-            @page { size: A4 portrait; margin: 0; }
-            body, html { margin: 0; padding: 0; background: white; width: 100%; height: 100%; }
-            .no-print { display: none !important; } 
-            #canvas-container { background: none; padding: 0; margin: 0; width: 100%; height: 100%; display: block; }
-            canvas { width: 210mm !important; height: 297mm !important; max-width: none; box-shadow: none; display: block; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+
+        p.subtitle {
+            color: #64748b;
+            margin-bottom: 2rem;
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .controls {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            flex: 1;
+            min-width: 300px;
+            max-width: 400px;
+        }
+
+        .preview-area {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            flex: 2;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 0.5rem;
+            border: 2px dashed #cbd5e1;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        input[type="text"].readonly-value {
+            width: 100%; 
+            padding: 0.5rem;
+            background-color: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            border-radius: 6px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #e2e8f0;
+            background-image: linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee), 
+                              linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+
+        .value-display {
+            float: right;
+            color: var(--primary);
+            font-weight: normal;
+        }
+
+        .instructions {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #fff1f2; /* Light red tint for warning */
+            border: 1px solid #fecdd3;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: none;
+            margin: 10px auto;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-<div class="no-print">
-    <h1>🚀 Generador A4 Definitivo</h1>
-    <p>Alinea el cilindro con el círculo verde.</p>
-    
-    <div class="upload-btn-wrapper">
-        <button class="btn">📂 1. Subir Foto</button>
-        <input type="file" id="upload" accept="image/*">
+    <h1>Anamorfosis Cilíndrica + Guías</h1>
+    <p class="subtitle">Generador con marcas de registro de 8.5mm x 36mm.</p>
+
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label>1. Imagen Principal (Arriba)</label>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+
+            <div class="control-group">
+                <label>2. Imagen Opuesta (Abajo) <small style="font-weight:normal; color:#666">(Opcional)</small></label>
+                <input type="file" id="imageInput2" accept="image/*">
+            </div>
+
+            <div class="control-group">
+                <label>Diámetro del Cilindro (cm) <span id="val-inner" class="value-display">6 cm</span></label>
+                <input type="range" id="cylinderDiameter" min="2" max="15" step="0.5" value="6">
+            </div>
+
+            <div class="control-group">
+                <label>Límite Circular (cm) <span id="val-outer" class="value-display">18 cm</span></label>
+                <input type="range" id="totalDiameter" min="10" max="25" step="0.5" value="18">
+            </div>
+
+            <div class="control-group">
+                <label>Apertura del Arco <span id="val-angle" class="value-display">180°</span></label>
+                <input type="range" id="angleSpan" min="60" max="180" value="180">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="invertImage" checked> Invertir ambas (Espejo)
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showRects" checked> Mostrar Marcas Violetas
+                </label>
+                <small style="color: #666">Agrega guías laterales al círculo verde.</small>
+            </div>
+
+            <button id="downloadBtn" style="display: none;">Descargar Resultado</button>
+            <div id="loader" class="loader"></div>
+        </div>
+
+        <div class="preview-area">
+            <p id="placeholderText" style="color: #94a3b8;">La vista previa aparecerá aquí...</p>
+            <canvas id="canvas"></canvas>
+        </div>
     </div>
 
-    <div id="controls" style="display:none;">
-        <label>🔍 Zoom (Tamaño cara)</label>
-        <input type="range" id="scale" min="50" max="250" value="100">
-        
-        <label>⬆️ Altura (Alejar del cilindro)</label>
-        <input type="range" id="offset" min="0" max="100" value="20">
-        
-        <label>↔️ Ancho del Abanico</label>
-        <input type="range" id="sector" min="50" max="150" value="100">
-        
-        <br>
-        <button class="print-btn" onclick="window.print()">🖨️ IMPRIMIR</button>
+    <div class="container">
+        <div class="instructions">
+            <h3>⚠️ Nota sobre Impresión</h3>
+            <p>Con las guías, el ancho total es de <strong>20.7cm</strong>.</p>
+            <ol>
+                <li>Entra en una hoja A4 (21cm ancho) pero <strong>muy justo</strong> (1.5mm de margen por lado).</li>
+                <li>Si tu impresora corta los bordes, usa papel <strong>Oficio, Legal o A3</strong>.</li>
+                <li>Imprime siempre al <strong>100% de escala</strong>.</li>
+            </ol>
+        </div>
     </div>
-</div>
 
-<div id="canvas-container">
-    <canvas id="canvas"></canvas>
-</div>
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const imageInput2 = document.getElementById('imageInput2');
+        const cylinderDiameterInput = document.getElementById('cylinderDiameter');
+        const totalDiameterInput = document.getElementById('totalDiameter');
+        const angleSpanInput = document.getElementById('angleSpan');
+        const invertImageInput = document.getElementById('invertImage');
+        const showRectsInput = document.getElementById('showRects');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const loader = document.getElementById('loader');
+        const placeholderText = document.getElementById('placeholderText');
 
-<script>
-    const upload = document.getElementById('upload');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const scaleSlider = document.getElementById('scale');
-    const offsetSlider = document.getElementById('offset');
-    const sectorSlider = document.getElementById('sector');
-    const controlsDiv = document.getElementById('controls');
+        // Resolution Configuration
+        // Standard high-res calculation base: 1000px = 21cm
+        const PX_PER_CM = 1000 / 21.0; 
 
-    let img = new Image();
-    let isImageLoaded = false;
+        const updateDisplays = () => {
+            document.getElementById('val-inner').textContent = cylinderDiameterInput.value + ' cm';
+            document.getElementById('val-outer').textContent = totalDiameterInput.value + ' cm';
+            document.getElementById('val-angle').textContent = angleSpanInput.value + '°';
+        };
 
-    // A4: 210mm x 297mm
-    const CANVAS_WIDTH = 2480; 
-    const CANVAS_HEIGHT = 3508; 
-    // Radio del cilindro (30mm) proporcional al ancho A4 (210mm)
-    const CYLINDER_RADIUS_PX = CANVAS_WIDTH * (30 / 210);
+        let sourceImage = null;
+        let sourceImage2 = null;
 
-    upload.addEventListener('change', (e) => {
-        if(e.target.files && e.target.files[0]){
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                img.onload = () => {
-                    isImageLoaded = true;
-                    controlsDiv.style.display = 'block';
-                    draw();
-                }
-                img.src = event.target.result;
+        const handleImageUpload = (file, isSecond = false) => {
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        if (isSecond) sourceImage2 = img;
+                        else {
+                            sourceImage = img;
+                            placeholderText.style.display = 'none';
+                        }
+                        processImage();
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
             }
-            reader.readAsDataURL(e.target.files[0]);
-        }
-    });
+        };
 
-    [scaleSlider, offsetSlider, sectorSlider].forEach(el => el.addEventListener('input', draw));
+        imageInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], false));
+        imageInput2.addEventListener('change', (e) => handleImageUpload(e.target.files[0], true));
 
-    function draw() {
-        if (!isImageLoaded) return;
+        [cylinderDiameterInput, totalDiameterInput, angleSpanInput, invertImageInput, showRectsInput].forEach(input => {
+            input.addEventListener('input', () => {
+                if(input.id === 'totalDiameter' || input.id === 'cylinderDiameter') {
+                    if(parseFloat(totalDiameterInput.value) <= parseFloat(cylinderDiameterInput.value)) {
+                        totalDiameterInput.value = parseFloat(cylinderDiameterInput.value) + 1;
+                    }
+                }
+                updateDisplays();
+                if (sourceImage || sourceImage2) processImage();
+            });
+        });
 
-        canvas.width = CANVAS_WIDTH;
-        canvas.height = CANVAS_HEIGHT;
-        
-        // CENTRO MATEMÁTICO: ABAJO AL MEDIO
-        const cx = CANVAS_WIDTH / 2;
-        const cy = CANVAS_HEIGHT; 
-        
-        // Limpiar
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        function processImage() {
+            if (!sourceImage && !sourceImage2) return;
 
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = img.width;
-        tempCanvas.height = img.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(img, 0, 0);
-        const sourceData = tempCtx.getImageData(0, 0, img.width, img.height);
+            loader.style.display = 'block';
+            downloadBtn.style.display = 'none';
 
-        const destImageData = ctx.createImageData(CANVAS_WIDTH, CANVAS_HEIGHT);
-        const data = destImageData.data;
+            requestAnimationFrame(() => {
+                const reqTotalDiamCm = parseFloat(totalDiameterInput.value);
+                const cylDiamCm = parseFloat(cylinderDiameterInput.value);
+                const spanDeg = parseInt(angleSpanInput.value);
+                const showRects = showRectsInput.checked;
 
-        const rInner = CYLINDER_RADIUS_PX; 
-        const offsetVal = offsetSlider.value * 15; 
-        const rStart = rInner + offsetVal;
-        
-        const zoom = scaleSlider.value / 100;
-        
-        // ANCHO DEL ABANICO
-        const SECTOR_ANGLE = Math.PI * (sectorSlider.value / 100); 
+                // --- CONSTANTS ---
+                const offsetCm = 1.8; 
+                const offsetPx = offsetCm * PX_PER_CM;
+                const limitRadiusCm = 9.5; // 19cm / 2
+                
+                // --- CANVAS SIZING ---
+                // Rectangles: 8.5mm width x 36mm height
+                const rectW_cm = 0.85; // 8.5mm
+                const rectH_cm = 3.6;  // 36mm
+                
+                // Total width needed: 19cm (circle) + 2 * 0.85cm = 20.7cm
+                // Let's use 25cm canvas to allow safe margins in the digital file
+                const requiredWidthCm = 25.0; 
+                const requiredHeightCm = 25.0;
 
-        // Definimos la distancia visible máxima como el alto de la hoja A4 recto hacia arriba.
-        const visibleHeight = CANVAS_HEIGHT - rStart;
+                const canvasWidth = requiredWidthCm * PX_PER_CM;
+                const canvasHeight = requiredHeightCm * PX_PER_CM;
+                
+                canvas.width = canvasWidth;
+                canvas.height = canvasHeight;
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        for (let y = 0; y < CANVAS_HEIGHT; y++) {
+                // --- CONSTRAINT LOGIC ---
+                const maxAllowedImageRadiusCm = limitRadiusCm - offsetCm; 
+                let effTotalDiamCm = reqTotalDiamCm;
+                let wasClamped = false;
+                if ((reqTotalDiamCm / 2) > maxAllowedImageRadiusCm) {
+                    effTotalDiamCm = maxAllowedImageRadiusCm * 2; 
+                    wasClamped = true;
+                }
+
+                // --- DATA PREP ---
+                const getSourceData = (img) => {
+                    if (!img) return null;
+                    const c = document.createElement('canvas');
+                    c.width = img.width;
+                    c.height = img.height;
+                    const cx = c.getContext('2d');
+                    cx.save();
+                    if (invertImageInput.checked) {
+                        cx.translate(img.width, 0);
+                        cx.scale(-1, 1);
+                    }
+                    cx.drawImage(img, 0, 0);
+                    cx.restore();
+                    return { data: cx.getImageData(0, 0, img.width, img.height).data, width: img.width, height: img.height };
+                };
+                const src1 = getSourceData(sourceImage);
+                const src2 = getSourceData(sourceImage2);
+                const destImageData = ctx.createImageData(canvas.width, canvas.height);
+
+                // --- GEOMETRY CENTERS ---
+                const cx = canvas.width / 2;
+                const visualCenterY = canvas.height / 2; // Center everything
+
+                // Geometric centers relative to visual center
+                const cy1 = visualCenterY - offsetPx; // Top Image Geometric Center
+                const cy2 = visualCenterY + offsetPx; // Bottom Image Geometric Center
+
+                const rInner = (cylDiamCm / 2) * PX_PER_CM;
+                const rOuter = (effTotalDiamCm / 2) * PX_PER_CM;
+                const halfSpanRad = (spanDeg * Math.PI / 180) / 2;
+                const center1 = -Math.PI / 2; 
+                const center2 = Math.PI / 2;
+
+                const data = destImageData.data;
+
+                const mapPixel = (angle, distance, centerAngle, src) => {
+                    const normalizedAngle = (angle - (centerAngle - halfSpanRad)) / (2 * halfSpanRad);
+                    const normalizedRadius = (distance - rInner) / (rOuter - rInner);
+                    const srcYFactor = 1 - normalizedRadius; 
+                    const sx = Math.floor(normalizedAngle * src.width);
+                    const sy = Math.floor(srcYFactor * src.height);
+                    const safeSx = Math.min(Math.max(sx, 0), src.width - 1);
+                    const safeSy = Math.min(Math.max(sy, 0), src.height - 1);
+                    return (safeSy * src.width + safeSx) * 4;
+                };
+
+                for (let y = 0; y < canvas.height; y++) {
+                    for (let x = 0; x < canvas.width; x++) {
+                        const dx = x - cx;
+                        const destIndex = (y * canvas.width + x) * 4;
+                        let drawn = false;
+
+                        // Image 1
+                        const dy1 = y - cy1;
+                        const dist1 = Math.sqrt(dx*dx + dy1*dy1);
+                        if (src1 && dist1 >= rInner && dist1 <= rOuter) {
+                            const ang1 = Math.atan2(dy1, dx);
+                            let diff1 = ang1 - center1;
+                            while (diff1 <= -Math.PI) diff1 += 2*Math.PI;
+                            while (diff1 > Math.PI) diff1 -= 2*Math.PI;
+                            if (Math.abs(diff1) <= halfSpanRad) {
+                                const sIdx = mapPixel(ang1, dist1, center1, src1);
+                                data[destIndex] = src1.data[sIdx];
+                                data[destIndex+1] = src1.data[sIdx+1];
+                                data[destIndex+2] = src1.data[sIdx+2];
+                                data[destIndex+3] = src1.data[sIdx+3];
+                                drawn = true;
+                            }
+                        }
+
+                        // Image 2
+                        if (!drawn && src2) {
+                            const dy2 = y - cy2;
+                            const dist2 = Math.sqrt(dx*dx + dy2*dy2);
+                            if (dist2 >= rInner && dist2 <= rOuter) {
+                                const ang2 = Math.atan2(dy2, dx);
+                                let diff2 = ang2 - center2;
+                                while (diff2 <= -Math.PI) diff2 += 2*Math.PI;
+                                while (diff2 > Math.PI) diff2 -= 2*Math.PI;
+                                if (Math.abs(diff2) <= halfSpanRad) {
+                                    const sIdx = mapPixel(ang2, dist2, center2, src2);
+                                    data[destIndex] = src2.data[sIdx];
+                                    data[destIndex+1] = src2.data[sIdx+1];
+                                    data[destIndex+2] = src2.data[sIdx+2];
+                                    data[destIndex+3] = src2.data[sIdx+3];
+                                    drawn = true;
+                                }
+                            }
+                        }
+
+                        if (!drawn) {
+                            data[destIndex] = 255; data[destIndex+1] = 255; data[destIndex+2] = 255; data[destIndex+3] = 255;
+                        }
+                    }
+                }
+                ctx.putImageData(destImageData, 0, 0);
+
+                // --- VISUAL ELEMENTS ---
+
+                // 1. PURPLE RECTANGLES (MARKERS)
+                if (showRects) {
+                    const rectWidthPx = rectW_cm * PX_PER_CM;
+                    const rectHeightPx = rectH_cm * PX_PER_CM;
+                    
+                    // NEW: Use 3cm radius (6cm diameter) for positioning markers
+                    const guideRadiusPx = 3 * PX_PER_CM; 
+                    
+                    ctx.fillStyle = 'rgba(139, 92, 246, 0.4)'; // Purple transparent
+                    ctx.strokeStyle = '#7c3aed'; // Darker purple border
+                    ctx.lineWidth = 1;
+
+                    // Left Rectangle (Positioned at Left edge of GREEN circle)
+                    const lx = cx - guideRadiusPx - rectWidthPx;
+                    const ly = visualCenterY - (rectHeightPx / 2);
+                    
+                    ctx.fillRect(lx, ly, rectWidthPx, rectHeightPx);
+                    ctx.strokeRect(lx, ly, rectWidthPx, rectHeightPx);
+
+                    // Right Rectangle (Positioned at Right edge of GREEN circle)
+                    const rx = cx + guideRadiusPx;
+                    const ry = visualCenterY - (rectHeightPx / 2);
+                    
+                    ctx.fillRect(rx, ry, rectWidthPx, rectHeightPx);
+                    ctx.strokeRect(rx, ry, rectWidthPx, rectHeightPx);
+                    
+                    // Dimensions Labels (Small)
+                    ctx.fillStyle = '#6d28d9';
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    
+                    ctx.save();
+                    ctx.translate(lx - 12, visualCenterY);
+                    ctx.rotate(-Math.PI/2);
+                    ctx.fillText('36mm', 0, 0);
+                    ctx.restore();
+                }
+
+                // 2. Guides (Visual Center)
+                const radius19cm = (limitRadiusCm * PX_PER_CM); 
+                
+                // Grey Circle (19cm)
+                ctx.beginPath();
+                ctx.arc(cx, visualCenterY, radius19cm, 0, Math.PI * 2);
+                ctx.strokeStyle = '#64748b'; 
+                ctx.lineWidth = 2;
+                ctx.setLineDash([10, 10]); 
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Green Circle (6cm)
+                const radius6cm = (3 * PX_PER_CM); 
+                ctx.beginPath();
+                ctx.arc(cx, visualCenterY, radius6cm, 0, Math.PI * 2);
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // Arrows
+                ctx.beginPath();
+                ctx.moveTo(cx, cy1 + rInner); 
+                ctx.lineTo(cx, visualCenterY);
+                ctx.strokeStyle = '#ef4444'; 
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx        for (let y = 0; y < CANVAS_HEIGHT; y++) {
             for (let x = 0; x < CANVAS_WIDTH; x++) {
                 const dx = x - cx;
                 const dy = y - cy; 
@@ -664,4 +1021,5 @@
     </script>
 </body>
 </html>
+
 
