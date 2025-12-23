@@ -140,8 +140,8 @@
         .instructions {
             margin-top: 2rem;
             padding: 1rem;
-            background: #fff1f2; /* Light red tint for warning */
-            border: 1px solid #fecdd3;
+            background: #f0fdf4; /* Green tint for correct info */
+            border: 1px solid #bbf7d0;
             border-radius: 6px;
             font-size: 0.9rem;
             line-height: 1.5;
@@ -163,8 +163,8 @@
 </head>
 <body>
 
-    <h1>Anamorfosis Cilíndrica + Guías</h1>
-    <p class="subtitle">Generador con marcas de registro de 8.5mm x 36mm.</p>
+    <h1>Anamorfosis Cilíndrica (A4)</h1>
+    <p class="subtitle">Generador configurado para impresión A4 exacta (300 DPI).</p>
 
     <div class="container">
         <div class="controls">
@@ -203,7 +203,7 @@
                 <label>
                     <input type="checkbox" id="showRects" checked> Mostrar Marcas Violetas
                 </label>
-                <small style="color: #666">Agrega guías laterales al círculo verde.</small>
+                <small style="color: #666">Agrega guías laterales de 8.5mm x 36mm.</small>
             </div>
 
             <button id="downloadBtn" style="display: none;">Descargar Resultado</button>
@@ -218,12 +218,13 @@
 
     <div class="container">
         <div class="instructions">
-            <h3>⚠️ Nota sobre Impresión</h3>
-            <p>Con las guías, el ancho total es de <strong>20.7cm</strong>.</p>
+            <h3>✅ Instrucciones de Impresión A4</h3>
+            <p>La imagen generada es una hoja A4 exacta (210x297mm) a 300 DPI.</p>
             <ol>
-                <li>Entra en una hoja A4 (21cm ancho) pero <strong>muy justo</strong> (1.5mm de margen por lado).</li>
-                <li>Si tu impresora corta los bordes, usa papel <strong>Oficio, Legal o A3</strong>.</li>
-                <li>Imprime siempre al <strong>100% de escala</strong>.</li>
+                <li>Descarga la imagen.</li>
+                <li>Al imprimir, selecciona el tamaño de papel <strong>A4</strong>.</li>
+                <li>Importante: En la configuración de escala, elige <strong>"Tamaño real"</strong> o <strong>"Escala 100%"</strong>.</li>
+                <li>No uses "Ajustar a página" o "Llenar página".</li>
             </ol>
         </div>
     </div>
@@ -242,9 +243,18 @@
         const loader = document.getElementById('loader');
         const placeholderText = document.getElementById('placeholderText');
 
-        // Resolution Configuration
-        // Standard high-res calculation base: 1000px = 21cm
-        const PX_PER_CM = 1000 / 21.0; 
+        // --- RESOLUTION CONFIGURATION FOR A4 PRINTING ---
+        // A4 Size: 210mm x 297mm
+        // Print Resolution: 300 DPI (Standard High Quality)
+        // 1 inch = 2.54 cm
+        // Pixels per cm = 300 / 2.54 = ~118.11
+        
+        const DPI = 300;
+        const PX_PER_CM = DPI / 2.54; 
+        
+        // Exact A4 dimensions in pixels
+        const A4_WIDTH_PX = Math.round(21.0 * PX_PER_CM);  // ~2480 px
+        const A4_HEIGHT_PX = Math.round(29.7 * PX_PER_CM); // ~3508 px
 
         const updateDisplays = () => {
             document.getElementById('val-inner').textContent = cylinderDiameterInput.value + ' cm';
@@ -304,31 +314,23 @@
                 // --- CONSTANTS ---
                 const offsetCm = 1.8; 
                 const offsetPx = offsetCm * PX_PER_CM;
-                const limitRadiusCm = 9.5; // 19cm / 2
+                const limitRadiusCm = 9.5; // 19cm / 2 (Fixed for A4 constraint)
                 
-                // --- CANVAS SIZING ---
-                // Rectangles: 8.5mm width x 36mm height
-                const rectW_cm = 0.85; // 8.5mm
-                const rectH_cm = 3.6;  // 36mm
+                // --- CANVAS SIZING (FIXED A4) ---
+                canvas.width = A4_WIDTH_PX;
+                canvas.height = A4_HEIGHT_PX;
                 
-                // Total width needed: 19cm (circle) + 2 * 0.85cm = 20.7cm
-                // Let's use 25cm canvas to allow safe margins in the digital file
-                const requiredWidthCm = 25.0; 
-                const requiredHeightCm = 25.0;
-
-                const canvasWidth = requiredWidthCm * PX_PER_CM;
-                const canvasHeight = requiredHeightCm * PX_PER_CM;
-                
-                canvas.width = canvasWidth;
-                canvas.height = canvasHeight;
-                
+                // White background (The paper)
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                 // --- CONSTRAINT LOGIC ---
+                // Max radius is 9.5cm (19cm diam) minus offset
                 const maxAllowedImageRadiusCm = limitRadiusCm - offsetCm; 
                 let effTotalDiamCm = reqTotalDiamCm;
                 let wasClamped = false;
+                
+                // Check if user requested size fits in 19cm circle with offset
                 if ((reqTotalDiamCm / 2) > maxAllowedImageRadiusCm) {
                     effTotalDiamCm = maxAllowedImageRadiusCm * 2; 
                     wasClamped = true;
@@ -355,8 +357,9 @@
                 const destImageData = ctx.createImageData(canvas.width, canvas.height);
 
                 // --- GEOMETRY CENTERS ---
+                // Center of the A4 page
                 const cx = canvas.width / 2;
-                const visualCenterY = canvas.height / 2; // Center everything
+                const visualCenterY = canvas.height / 2; 
 
                 // Geometric centers relative to visual center
                 const cy1 = visualCenterY - offsetPx; // Top Image Geometric Center
@@ -381,8 +384,25 @@
                     return (safeSy * src.width + safeSx) * 4;
                 };
 
-                for (let y = 0; y < canvas.height; y++) {
-                    for (let x = 0; x < canvas.width; x++) {
+                // Optimize loop: Scan only the area that can contain the 19cm circle to save performance
+                // 19cm is approx 2244 px. 
+                // Bounds: cx +/- 1200px, visualCenterY +/- 1200px
+                const scanMargin = (limitRadiusCm + 1) * PX_PER_CM;
+                const startY = Math.max(0, Math.floor(visualCenterY - scanMargin));
+                const endY = Math.min(canvas.height, Math.ceil(visualCenterY + scanMargin));
+                const startX = Math.max(0, Math.floor(cx - scanMargin));
+                const endX = Math.min(canvas.width, Math.ceil(cx + scanMargin));
+
+                // Initialize transparent/white
+                // (Since we filled white rect, data is technically 0,0,0,0 for ImageData until put)
+                // We need to fill white manually or just skip pixels we don't draw on?
+                // ImageData is init as transparent black. We want white.
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
+                }
+
+                for (let y = startY; y < endY; y++) {
+                    for (let x = startX; x < endX; x++) {
                         const dx = x - cx;
                         const destIndex = (y * canvas.width + x) * 4;
                         let drawn = false;
@@ -424,10 +444,6 @@
                                 }
                             }
                         }
-
-                        if (!drawn) {
-                            data[destIndex] = 255; data[destIndex+1] = 255; data[destIndex+2] = 255; data[destIndex+3] = 255;
-                        }
                     }
                 }
                 ctx.putImageData(destImageData, 0, 0);
@@ -436,15 +452,15 @@
 
                 // 1. PURPLE RECTANGLES (MARKERS)
                 if (showRects) {
-                    const rectWidthPx = rectW_cm * PX_PER_CM;
-                    const rectHeightPx = rectH_cm * PX_PER_CM;
+                    const rectWidthPx = 0.85 * PX_PER_CM; // 8.5mm
+                    const rectHeightPx = 3.6 * PX_PER_CM; // 36mm
                     
-                    // NEW: Use 3cm radius (6cm diameter) for positioning markers
+                    // Use 3cm radius (6cm diameter) for positioning markers (The Green Circle)
                     const guideRadiusPx = 3 * PX_PER_CM; 
                     
                     ctx.fillStyle = 'rgba(139, 92, 246, 0.4)'; // Purple transparent
                     ctx.strokeStyle = '#7c3aed'; // Darker purple border
-                    ctx.lineWidth = 1;
+                    ctx.lineWidth = 2; // Thicker for high res
 
                     // Left Rectangle (Positioned at Left edge of GREEN circle)
                     const lx = cx - guideRadiusPx - rectWidthPx;
@@ -460,13 +476,13 @@
                     ctx.fillRect(rx, ry, rectWidthPx, rectHeightPx);
                     ctx.strokeRect(rx, ry, rectWidthPx, rectHeightPx);
                     
-                    // Dimensions Labels (Small)
+                    // Dimensions Labels
                     ctx.fillStyle = '#6d28d9';
-                    ctx.font = '10px Arial';
+                    ctx.font = '24px Arial'; // Larger font for 300DPI
                     ctx.textAlign = 'center';
                     
                     ctx.save();
-                    ctx.translate(lx - 12, visualCenterY);
+                    ctx.translate(lx - 25, visualCenterY);
                     ctx.rotate(-Math.PI/2);
                     ctx.fillText('36mm', 0, 0);
                     ctx.restore();
@@ -479,8 +495,8 @@
                 ctx.beginPath();
                 ctx.arc(cx, visualCenterY, radius19cm, 0, Math.PI * 2);
                 ctx.strokeStyle = '#64748b'; 
-                ctx.lineWidth = 2;
-                ctx.setLineDash([10, 10]); 
+                ctx.lineWidth = 4; // Thicker for high res
+                ctx.setLineDash([20, 20]); 
                 ctx.stroke();
                 ctx.setLineDash([]);
 
@@ -489,7 +505,7 @@
                 ctx.beginPath();
                 ctx.arc(cx, visualCenterY, radius6cm, 0, Math.PI * 2);
                 ctx.strokeStyle = '#22c55e';
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 6; // Thicker
                 ctx.stroke();
 
                 // Arrows
@@ -497,489 +513,7 @@
                 ctx.moveTo(cx, cy1 + rInner); 
                 ctx.lineTo(cx, visualCenterY);
                 ctx.strokeStyle = '#ef4444'; 
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                ctx        for (let y = 0; y < CANVAS_HEIGHT; y++) {
-            for (let x = 0; x < CANVAS_WIDTH; x++) {
-                const dx = x - cx;
-                const dy = y - cy; 
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                
-                if (dist < rStart) continue;
-
-                let angle = Math.atan2(dy, dx); 
-                let adjustedAngle = angle + (Math.PI / 2);
-
-                const halfSector = SECTOR_ANGLE / 2;
-                if (Math.abs(adjustedAngle) > halfSector) continue;
-
-                // Mapeo X (Ancho)
-                const anglePercent = (adjustedAngle + halfSector) / SECTOR_ANGLE;
-                const u = anglePercent * img.width;
-                
-                // Mapeo Y (Alto)
-                const distFromStart = dist - rStart;
-                const distNormalizada = distFromStart / visibleHeight;
-                
-                const v = (1 - distNormalizada) * img.height * zoom;
-
-                if (v < 0 || v >= img.height) continue;
-
-                const safeX = Math.min(Math.max(Math.floor(u), 0), img.width - 1);
-                const safeY = Math.min(Math.max(Math.floor(v), 0), img.height - 1);
-
-                const srcIndex = (safeY * img.width + safeX) * 4;
-                const destIndex = (y * CANVAS_WIDTH + x) * 4;
-
-                data[destIndex] = sourceData.data[srcIndex];
-                data[destIndex + 1] = sourceData.data[srcIndex + 1];
-                data[destIndex + 2] = sourceData.data[srcIndex + 2];
-                data[destIndex + 3] = 255;
-            }
-        }
-
-        ctx.putImageData(destImageData, 0, 0);
-        
-        // --- GUÍAS VISUALES ---
-        
-        // 1. Círculo guía VERDE (DIBUJADO AL FINAL PARA QUE NO SE CORTE)
-        ctx.beginPath();
-        ctx.arc(cx, cy, rInner, 0, 2 * Math.PI); // Círculo completo
-        ctx.strokeStyle = "#00FF00"; // Verde brillante
-        ctx.lineWidth = 8; // Un poco más grueso para que se vea bien
-        ctx.stroke();
-
-        // 2. Relleno gris del cilindro (solo la parte visible en el papel)
-        ctx.beginPath();
-        ctx.arc(cx, cy, rInner, Math.PI, 0); 
-        ctx.fillStyle = "#ddd";
-        ctx.fill();
-        
-        // Texto
-        ctx.fillStyle = "#333";
-        ctx.font = "bold 40px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("COLOCAR", cx, cy - 60);
-        ctx.fillText("CILINDRO", cx, cy - 20);
-
-        // 3. Muesca / Flecha de alineación
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - rInner); 
-        ctx.lineTo(cx - 50, cy - rInner - 80);
-        ctx.lineTo(cx + 50, cy - rInner - 80);
-        ctx.closePath();
-        ctx.fillStyle = "#333";
-        ctx.fill();
-
-        // 4. Línea de inicio (Offset)
-        if (offsetSlider.value > 0) {
-            ctx.beginPath();
-            ctx.arc(cx, cy, rStart, Math.PI, 0);
-            ctx.strokeStyle = "#ffaaaa";
-            ctx.setLineDash([20, 20]);
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-    }
-</script>
-
-</body>
-</html>
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            transition: opacity 0.2s;
-            margin-top: 10px;
-        }
-
-        button:hover {
-            opacity: 0.9;
-        }
-
-        canvas {
-            max-width: 100%;
-            height: auto;
-            border: 1px solid #e2e8f0;
-            background-image: linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee), 
-                              linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%, #eee);
-            background-size: 20px 20px;
-            background-position: 0 0, 10px 10px;
-        }
-
-        .value-display {
-            float: right;
-            color: var(--primary);
-            font-weight: normal;
-        }
-
-        .instructions {
-            margin-top: 2rem;
-            padding: 1rem;
-            background: #fff1f2; /* Light red tint for warning */
-            border: 1px solid #fecdd3;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
-
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            display: none;
-            margin: 10px auto;
-        }
-
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
-</head>
-<body>
-
-    <h1>Anamorfosis Cilíndrica + Guías</h1>
-    <p class="subtitle">Generador con marcas de registro de 8.5mm x 36mm.</p>
-
-    <div class="container">
-        <div class="controls">
-            <div class="control-group">
-                <label>1. Imagen Principal (Arriba)</label>
-                <input type="file" id="imageInput" accept="image/*">
-            </div>
-
-            <div class="control-group">
-                <label>2. Imagen Opuesta (Abajo) <small style="font-weight:normal; color:#666">(Opcional)</small></label>
-                <input type="file" id="imageInput2" accept="image/*">
-            </div>
-
-            <div class="control-group">
-                <label>Diámetro del Cilindro (cm) <span id="val-inner" class="value-display">6 cm</span></label>
-                <input type="range" id="cylinderDiameter" min="2" max="15" step="0.5" value="6">
-            </div>
-
-            <div class="control-group">
-                <label>Límite Circular (cm) <span id="val-outer" class="value-display">18 cm</span></label>
-                <input type="range" id="totalDiameter" min="10" max="25" step="0.5" value="18">
-            </div>
-
-            <div class="control-group">
-                <label>Apertura del Arco <span id="val-angle" class="value-display">180°</span></label>
-                <input type="range" id="angleSpan" min="60" max="180" value="180">
-            </div>
-            
-            <div class="control-group">
-                <label>
-                    <input type="checkbox" id="invertImage" checked> Invertir ambas (Espejo)
-                </label>
-            </div>
-
-            <div class="control-group">
-                <label>
-                    <input type="checkbox" id="showRects" checked> Mostrar Marcas Violetas
-                </label>
-                <small style="color: #666">Agrega guías laterales al círculo verde.</small>
-            </div>
-
-            <button id="downloadBtn" style="display: none;">Descargar Resultado</button>
-            <div id="loader" class="loader"></div>
-        </div>
-
-        <div class="preview-area">
-            <p id="placeholderText" style="color: #94a3b8;">La vista previa aparecerá aquí...</p>
-            <canvas id="canvas"></canvas>
-        </div>
-    </div>
-
-    <div class="container">
-        <div class="instructions">
-            <h3>⚠️ Nota sobre Impresión</h3>
-            <p>Con las guías, el ancho total es de <strong>20.7cm</strong>.</p>
-            <ol>
-                <li>Entra en una hoja A4 (21cm ancho) pero <strong>muy justo</strong> (1.5mm de margen por lado).</li>
-                <li>Si tu impresora corta los bordes, usa papel <strong>Oficio, Legal o A3</strong>.</li>
-                <li>Imprime siempre al <strong>100% de escala</strong>.</li>
-            </ol>
-        </div>
-    </div>
-
-    <script>
-        const imageInput = document.getElementById('imageInput');
-        const imageInput2 = document.getElementById('imageInput2');
-        const cylinderDiameterInput = document.getElementById('cylinderDiameter');
-        const totalDiameterInput = document.getElementById('totalDiameter');
-        const angleSpanInput = document.getElementById('angleSpan');
-        const invertImageInput = document.getElementById('invertImage');
-        const showRectsInput = document.getElementById('showRects');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const loader = document.getElementById('loader');
-        const placeholderText = document.getElementById('placeholderText');
-
-        // Resolution Configuration
-        // Standard high-res calculation base: 1000px = 21cm
-        const PX_PER_CM = 1000 / 21.0; 
-
-        const updateDisplays = () => {
-            document.getElementById('val-inner').textContent = cylinderDiameterInput.value + ' cm';
-            document.getElementById('val-outer').textContent = totalDiameterInput.value + ' cm';
-            document.getElementById('val-angle').textContent = angleSpanInput.value + '°';
-        };
-
-        let sourceImage = null;
-        let sourceImage2 = null;
-
-        const handleImageUpload = (file, isSecond = false) => {
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        if (isSecond) sourceImage2 = img;
-                        else {
-                            sourceImage = img;
-                            placeholderText.style.display = 'none';
-                        }
-                        processImage();
-                    };
-                    img.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-
-        imageInput.addEventListener('change', (e) => handleImageUpload(e.target.files[0], false));
-        imageInput2.addEventListener('change', (e) => handleImageUpload(e.target.files[0], true));
-
-        [cylinderDiameterInput, totalDiameterInput, angleSpanInput, invertImageInput, showRectsInput].forEach(input => {
-            input.addEventListener('input', () => {
-                if(input.id === 'totalDiameter' || input.id === 'cylinderDiameter') {
-                    if(parseFloat(totalDiameterInput.value) <= parseFloat(cylinderDiameterInput.value)) {
-                        totalDiameterInput.value = parseFloat(cylinderDiameterInput.value) + 1;
-                    }
-                }
-                updateDisplays();
-                if (sourceImage || sourceImage2) processImage();
-            });
-        });
-
-        function processImage() {
-            if (!sourceImage && !sourceImage2) return;
-
-            loader.style.display = 'block';
-            downloadBtn.style.display = 'none';
-
-            requestAnimationFrame(() => {
-                const reqTotalDiamCm = parseFloat(totalDiameterInput.value);
-                const cylDiamCm = parseFloat(cylinderDiameterInput.value);
-                const spanDeg = parseInt(angleSpanInput.value);
-                const showRects = showRectsInput.checked;
-
-                // --- CONSTANTS ---
-                const offsetCm = 1.8; 
-                const offsetPx = offsetCm * PX_PER_CM;
-                const limitRadiusCm = 9.5; // 19cm / 2
-                
-                // --- CANVAS SIZING ---
-                // Rectangles: 8.5mm width x 36mm height
-                const rectW_cm = 0.85; // 8.5mm
-                const rectH_cm = 3.6;  // 36mm
-                
-                // Total width needed: 19cm (circle) + 2 * 0.85cm = 20.7cm
-                // Let's use 25cm canvas to allow safe margins in the digital file
-                const requiredWidthCm = 25.0; 
-                const requiredHeightCm = 25.0;
-
-                const canvasWidth = requiredWidthCm * PX_PER_CM;
-                const canvasHeight = requiredHeightCm * PX_PER_CM;
-                
-                canvas.width = canvasWidth;
-                canvas.height = canvasHeight;
-                
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // --- CONSTRAINT LOGIC ---
-                const maxAllowedImageRadiusCm = limitRadiusCm - offsetCm; 
-                let effTotalDiamCm = reqTotalDiamCm;
-                let wasClamped = false;
-                if ((reqTotalDiamCm / 2) > maxAllowedImageRadiusCm) {
-                    effTotalDiamCm = maxAllowedImageRadiusCm * 2; 
-                    wasClamped = true;
-                }
-
-                // --- DATA PREP ---
-                const getSourceData = (img) => {
-                    if (!img) return null;
-                    const c = document.createElement('canvas');
-                    c.width = img.width;
-                    c.height = img.height;
-                    const cx = c.getContext('2d');
-                    cx.save();
-                    if (invertImageInput.checked) {
-                        cx.translate(img.width, 0);
-                        cx.scale(-1, 1);
-                    }
-                    cx.drawImage(img, 0, 0);
-                    cx.restore();
-                    return { data: cx.getImageData(0, 0, img.width, img.height).data, width: img.width, height: img.height };
-                };
-                const src1 = getSourceData(sourceImage);
-                const src2 = getSourceData(sourceImage2);
-                const destImageData = ctx.createImageData(canvas.width, canvas.height);
-
-                // --- GEOMETRY CENTERS ---
-                const cx = canvas.width / 2;
-                const visualCenterY = canvas.height / 2; // Center everything
-
-                // Geometric centers relative to visual center
-                const cy1 = visualCenterY - offsetPx; // Top Image Geometric Center
-                const cy2 = visualCenterY + offsetPx; // Bottom Image Geometric Center
-
-                const rInner = (cylDiamCm / 2) * PX_PER_CM;
-                const rOuter = (effTotalDiamCm / 2) * PX_PER_CM;
-                const halfSpanRad = (spanDeg * Math.PI / 180) / 2;
-                const center1 = -Math.PI / 2; 
-                const center2 = Math.PI / 2;
-
-                const data = destImageData.data;
-
-                const mapPixel = (angle, distance, centerAngle, src) => {
-                    const normalizedAngle = (angle - (centerAngle - halfSpanRad)) / (2 * halfSpanRad);
-                    const normalizedRadius = (distance - rInner) / (rOuter - rInner);
-                    const srcYFactor = 1 - normalizedRadius; 
-                    const sx = Math.floor(normalizedAngle * src.width);
-                    const sy = Math.floor(srcYFactor * src.height);
-                    const safeSx = Math.min(Math.max(sx, 0), src.width - 1);
-                    const safeSy = Math.min(Math.max(sy, 0), src.height - 1);
-                    return (safeSy * src.width + safeSx) * 4;
-                };
-
-                for (let y = 0; y < canvas.height; y++) {
-                    for (let x = 0; x < canvas.width; x++) {
-                        const dx = x - cx;
-                        const destIndex = (y * canvas.width + x) * 4;
-                        let drawn = false;
-
-                        // Image 1
-                        const dy1 = y - cy1;
-                        const dist1 = Math.sqrt(dx*dx + dy1*dy1);
-                        if (src1 && dist1 >= rInner && dist1 <= rOuter) {
-                            const ang1 = Math.atan2(dy1, dx);
-                            let diff1 = ang1 - center1;
-                            while (diff1 <= -Math.PI) diff1 += 2*Math.PI;
-                            while (diff1 > Math.PI) diff1 -= 2*Math.PI;
-                            if (Math.abs(diff1) <= halfSpanRad) {
-                                const sIdx = mapPixel(ang1, dist1, center1, src1);
-                                data[destIndex] = src1.data[sIdx];
-                                data[destIndex+1] = src1.data[sIdx+1];
-                                data[destIndex+2] = src1.data[sIdx+2];
-                                data[destIndex+3] = src1.data[sIdx+3];
-                                drawn = true;
-                            }
-                        }
-
-                        // Image 2
-                        if (!drawn && src2) {
-                            const dy2 = y - cy2;
-                            const dist2 = Math.sqrt(dx*dx + dy2*dy2);
-                            if (dist2 >= rInner && dist2 <= rOuter) {
-                                const ang2 = Math.atan2(dy2, dx);
-                                let diff2 = ang2 - center2;
-                                while (diff2 <= -Math.PI) diff2 += 2*Math.PI;
-                                while (diff2 > Math.PI) diff2 -= 2*Math.PI;
-                                if (Math.abs(diff2) <= halfSpanRad) {
-                                    const sIdx = mapPixel(ang2, dist2, center2, src2);
-                                    data[destIndex] = src2.data[sIdx];
-                                    data[destIndex+1] = src2.data[sIdx+1];
-                                    data[destIndex+2] = src2.data[sIdx+2];
-                                    data[destIndex+3] = src2.data[sIdx+3];
-                                    drawn = true;
-                                }
-                            }
-                        }
-
-                        if (!drawn) {
-                            data[destIndex] = 255; data[destIndex+1] = 255; data[destIndex+2] = 255; data[destIndex+3] = 255;
-                        }
-                    }
-                }
-                ctx.putImageData(destImageData, 0, 0);
-
-                // --- VISUAL ELEMENTS ---
-
-                // 1. PURPLE RECTANGLES (MARKERS)
-                if (showRects) {
-                    const rectWidthPx = rectW_cm * PX_PER_CM;
-                    const rectHeightPx = rectH_cm * PX_PER_CM;
-                    
-                    // NEW: Use 3cm radius (6cm diameter) for positioning markers
-                    const guideRadiusPx = 3 * PX_PER_CM; 
-                    
-                    ctx.fillStyle = 'rgba(139, 92, 246, 0.4)'; // Purple transparent
-                    ctx.strokeStyle = '#7c3aed'; // Darker purple border
-                    ctx.lineWidth = 1;
-
-                    // Left Rectangle (Positioned at Left edge of GREEN circle)
-                    const lx = cx - guideRadiusPx - rectWidthPx;
-                    const ly = visualCenterY - (rectHeightPx / 2);
-                    
-                    ctx.fillRect(lx, ly, rectWidthPx, rectHeightPx);
-                    ctx.strokeRect(lx, ly, rectWidthPx, rectHeightPx);
-
-                    // Right Rectangle (Positioned at Right edge of GREEN circle)
-                    const rx = cx + guideRadiusPx;
-                    const ry = visualCenterY - (rectHeightPx / 2);
-                    
-                    ctx.fillRect(rx, ry, rectWidthPx, rectHeightPx);
-                    ctx.strokeRect(rx, ry, rectWidthPx, rectHeightPx);
-                    
-                    // Dimensions Labels (Small)
-                    ctx.fillStyle = '#6d28d9';
-                    ctx.font = '10px Arial';
-                    ctx.textAlign = 'center';
-                    
-                    ctx.save();
-                    ctx.translate(lx - 12, visualCenterY);
-                    ctx.rotate(-Math.PI/2);
-                    ctx.fillText('36mm', 0, 0);
-                    ctx.restore();
-                }
-
-                // 2. Guides (Visual Center)
-                const radius19cm = (limitRadiusCm * PX_PER_CM); 
-                
-                // Grey Circle (19cm)
-                ctx.beginPath();
-                ctx.arc(cx, visualCenterY, radius19cm, 0, Math.PI * 2);
-                ctx.strokeStyle = '#64748b'; 
-                ctx.lineWidth = 2;
-                ctx.setLineDash([10, 10]); 
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // Green Circle (6cm)
-                const radius6cm = (3 * PX_PER_CM); 
-                ctx.beginPath();
-                ctx.arc(cx, visualCenterY, radius6cm, 0, Math.PI * 2);
-                ctx.strokeStyle = '#22c55e';
                 ctx.lineWidth = 3;
-                ctx.stroke();
-
-                // Arrows
-                ctx.beginPath();
-                ctx.moveTo(cx, cy1 + rInner); 
-                ctx.lineTo(cx, visualCenterY);
-                ctx.strokeStyle = '#ef4444'; 
-                ctx.lineWidth = 1;
                 ctx.stroke();
 
                 ctx.beginPath();
@@ -989,16 +523,16 @@
 
                 // Labels
                 ctx.fillStyle = '#15803d'; 
-                ctx.font = 'bold 14px Arial';
+                ctx.font = 'bold 30px Arial'; // Larger font
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText('COLOCAR', cx, visualCenterY - 10);
-                ctx.fillText('CILINDRO', cx, visualCenterY + 10);
+                ctx.fillText('COLOCAR', cx, visualCenterY - 20);
+                ctx.fillText('CILINDRO', cx, visualCenterY + 20);
                 
                 if (wasClamped) {
                     ctx.fillStyle = '#eab308';
-                    ctx.font = 'bold 20px Arial';
-                    ctx.fillText('⚠️ Ajustado a 19cm', cx, 50);
+                    ctx.font = 'bold 40px Arial';
+                    ctx.fillText('⚠️ Ajustado a 19cm', cx, 100);
                     document.getElementById('val-outer').textContent = effTotalDiamCm.toFixed(1) + ' cm (Ajustado)';
                     document.getElementById('val-outer').style.color = '#d97706';
                 } else {
@@ -1012,7 +546,7 @@
 
         downloadBtn.addEventListener('click', () => {
             const link = document.createElement('a');
-            link.download = 'anamorfosis-guias.png';
+            link.download = 'anamorfosis-A4.png';
             link.href = canvas.toDataURL();
             link.click();
         });
@@ -1021,5 +555,3 @@
     </script>
 </body>
 </html>
-
-
